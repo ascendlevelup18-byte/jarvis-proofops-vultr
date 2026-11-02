@@ -1,0 +1,32 @@
+{
+  "name": "jarvis-proofops-vultr",
+  "version": "0.1.0",
+  "private": true,
+  "description": "JARVIS: autonomous ecommerce exception resolver (duplicate charge workflow)",
+  "type": "module",
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "start": "npm run api:start",
+    "typecheck": "npm run api:typecheck",
+    "test": "npm run api:test && npm run web:test",
+    "check": "npm run api:check && npm run web:build && npm run web:test",
+    "api:start": "node apps/api/src/main.ts",
+    "api:typecheck": "tsc -p apps/api",
+    "api:test": "node --test apps/api/test/*.test.ts",
+    "api:check": "npm run api:typecheck && npm run api:test",
+    "web:dev": "npm run dev --prefix apps/web",
+    "web:build": "npm run build --prefix apps/web",
+    "web:typecheck": "npm run build --prefix apps/web",
+    "web:test": "node --test --experimental-strip-types apps/web/test/*.test.ts"
+  },
+  "dependencies": {
+    "zod": "^4.6.5"
+  },
+  "devDependencies": {
+    "@types/node": "^24.19.1",
+    "typescript": "^7.0.2"
+  },
+  "license": "MIT"
+}

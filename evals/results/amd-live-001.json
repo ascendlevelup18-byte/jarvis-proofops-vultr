@@ -1,0 +1,31 @@
+{
+  "test_id": "AMD-LIVE-001",
+  "captured_from": "owner's PowerShell 5.1 transcript of scripts/tokenfactory-smoke.ps1 (commit 55be4ab); transcript scanned (0 key-shaped strings) and deleted",
+  "date_local": "2026-10-14 13:14:48 (owner PC clock, transcript start)",
+  "provider": "AMD endpoint at developer.amd.com.cn (contract base URL from the owner's V3 document; not independently confirmed to be the hackathon Token Factory)",
+  "base_url": "https://developer.amd.com.cn/radeon/api/v1",
+  "model_requested": "DeepSeek-V4-Flash",
+  "model_returned": "self-dploy/DeepSeek-V4-Flash",
+  "request": { "messages": [{ "role": "user", "content": "Say hello in one sentence." }], "max_tokens": 64, "temperature": 0 },
+  "unauthenticated_models_status": 401,
+  "key_format_check": "pass (all four rules)",
+  "models_with_key": 12,
+  "usage_endpoint_status": 200,
+  "authentication": "VERIFIED",
+  "inference": "VERIFIED",
+  "http_status": 200,
+  "latency_ms": 1592,
+  "finish_reason": "stop",
+  "prompt_tokens": 10,
+  "completion_tokens": 14,
+  "reply": "Hello! I'm here to help you with anything you need.",
+  "rate_limit_headers": {
+    "x-ratelimit-limit-user-rpm": "20",
+    "x-ratelimit-remaining-user-rpm": "19",
+    "x-ratelimit-limit-user-daily-usd": "1",
+    "x-ratelimit-remaining-user-daily-usd": "1.00000000",
+    "x-ratelimit-used-user-daily-usd": "0.00000000",
+    "x-ratelimit-reset-user-daily-usd": "1792080000"
+  },
+  "secret_exposed": false
+}

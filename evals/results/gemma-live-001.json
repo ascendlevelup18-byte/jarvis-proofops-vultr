@@ -1,0 +1,25 @@
+{
+  "test_id": "GEMMA-LIVE-001",
+  "captured_from": "scripts/tokenfactory-smoke.ps1 console output pasted by the owner into the project thread (15 Oct 2026); transcript files scanned: 0 key-shaped strings",
+  "provider": "AMD Token Factory hosted inference API",
+  "base_url": "https://developer.amd.com.cn/radeon/api/v1",
+  "model_requested": "Gemma-4-31B-IT",
+  "model_returned": "self-dploy/Gemma-4-31B-IT",
+  "request": { "messages": [{ "role": "user", "content": "Say hello in one sentence." }], "max_tokens": 64, "temperature": 0 },
+  "attempts": "attempt 1: chat HTTP 401 Invalid LLMGateway API token (usage endpoint also 401); attempt 2: HTTP 200 (this record); attempt 3: no HTTP response within the 60 s client timeout; attempt 4: empty key, format check failed, nothing sent",
+  "authentication": "VERIFIED (second attempt)",
+  "inference": "VERIFIED",
+  "http_status": 200,
+  "latency_ms": 12144,
+  "finish_reason": "stop",
+  "prompt_tokens": 19,
+  "completion_tokens": 3,
+  "reply": "Hello!",
+  "rate_limit_headers": {
+    "x-ratelimit-limit-user-rpm": "20",
+    "x-ratelimit-limit-user-daily-usd": "1",
+    "x-ratelimit-remaining-user-daily-usd": "0.994085"
+  },
+  "secret_exposed": false,
+  "note": "One call only. 12.1 s for 3 completion tokens is a single sample and may include queueing; realistic understanding latency must come from the benchmark run."
+}

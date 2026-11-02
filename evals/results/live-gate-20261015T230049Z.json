@@ -1,0 +1,16 @@
+{
+    "capturedAt":  "2026-10-15T23:00:49.4437378Z",
+    "baseUrl":  "https://developer.amd.com.cn/radeon/api/v1",
+    "model":  "DeepSeek-V4-Flash",
+    "timeoutMs":  90000,
+    "understandingModel":  "Gemma-4-31B-IT",
+    "structuredOutput":  "json_object",
+    "runId":  "tg-1",
+    "gitHead":  "e86d518682e22d996c00774ae4893d2791abc953",
+    "gitDirty":  true,
+    "startupGate":  false,
+    "envCleared":  true,
+    "keyLeakFiles":  0,
+    "exitCode":  11,
+    "apiLogDir":  "C:\\Users\\xc\\AppData\\Local\\Temp\\jarvis-live-20261015T230049Z"
+}

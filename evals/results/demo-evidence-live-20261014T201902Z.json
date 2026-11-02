@@ -1,0 +1,197 @@
+{
+  "capturedAt": "2026-10-14T20:21:32.571Z",
+  "target": "127.0.0.1:3000",
+  "health": {
+    "aiMode": "vllm",
+    "model": "DeepSeek-V4-Flash",
+    "deployment": "node-server",
+    "paymentGateway": "simulated",
+    "provider": {
+      "endpoint": "https://developer.amd.com.cn/radeon/api/v1",
+      "model": "DeepSeek-V4-Flash",
+      "structuredOutput": "json_object",
+      "maxRetries": 1,
+      "startupProbes": {
+        "understanding": "ok",
+        "decision": "ok"
+      },
+      "calls": {
+        "ok": 2,
+        "failed": 0
+      },
+      "lastCall": {
+        "stage": "MODEL",
+        "model": "DeepSeek-V4-Flash",
+        "responseId": "ac563f86e3ff461bab6c61aa5a9cf6cc",
+        "finishReason": "stop",
+        "latencyMs": 13796,
+        "attempts": 1,
+        "promptTokens": 993,
+        "completionTokens": 137,
+        "failureCategory": null,
+        "at": "2026-10-14T20:20:46.983Z"
+      }
+    }
+  },
+  "cases": [
+    {
+      "orderId": "48291",
+      "caseId": "CASE-827f30a5-4426-469f-b469-1bee788edb5c",
+      "state": "RESOLVED",
+      "policy": "APPROVE",
+      "execution": "ACCEPTED",
+      "verified": true,
+      "aiCalls": [
+        {
+          "type": "UNDERSTANDING_CALL",
+          "at": "2026-10-14T20:20:54.489Z",
+          "adapter": "vllm:DeepSeek-V4-Flash",
+          "latencyMs": 2262,
+          "error": null
+        },
+        {
+          "type": "MODEL_CALL",
+          "at": "2026-10-14T20:21:01.634Z",
+          "adapter": "vllm:DeepSeek-V4-Flash",
+          "latencyMs": 7144,
+          "error": null
+        }
+      ]
+    },
+    {
+      "orderId": "48294",
+      "caseId": "CASE-76a8dfd9-9471-4d3b-95d4-d2670aea7b87",
+      "state": "ESCALATED",
+      "policy": "DENY",
+      "execution": "none",
+      "verified": null,
+      "aiCalls": [
+        {
+          "type": "UNDERSTANDING_CALL",
+          "at": "2026-10-14T20:21:04.182Z",
+          "adapter": "vllm:DeepSeek-V4-Flash",
+          "latencyMs": 2543,
+          "error": null
+        },
+        {
+          "type": "MODEL_CALL",
+          "at": "2026-10-14T20:21:13.631Z",
+          "adapter": "vllm:DeepSeek-V4-Flash",
+          "latencyMs": 9448,
+          "error": null
+        }
+      ]
+    },
+    {
+      "orderId": "48293",
+      "caseId": "CASE-b62a27a5-cdbb-4750-bdd3-95127aabf5df",
+      "state": "CLOSED_NO_ACTION",
+      "policy": "NO_ACTION",
+      "execution": "none",
+      "verified": null,
+      "aiCalls": [
+        {
+          "type": "UNDERSTANDING_CALL",
+          "at": "2026-10-14T20:21:15.552Z",
+          "adapter": "vllm:DeepSeek-V4-Flash",
+          "latencyMs": 1917,
+          "error": null
+        },
+        {
+          "type": "MODEL_CALL",
+          "at": "2026-10-14T20:21:23.004Z",
+          "adapter": "vllm:DeepSeek-V4-Flash",
+          "latencyMs": 7452,
+          "error": null
+        }
+      ]
+    }
+  ],
+  "checks": [
+    {
+      "ok": true,
+      "name": "1 API health",
+      "detail": "HTTP 200 · aiMode=vllm · deployment=node-server"
+    },
+    {
+      "ok": true,
+      "name": "payments are simulated",
+      "detail": "paymentGateway=simulated"
+    },
+    {
+      "ok": true,
+      "name": "2 Demo store available",
+      "detail": "HTTP 200 · 4 orders · data=synthetic · payments=simulated"
+    },
+    {
+      "ok": true,
+      "name": "3 #48291 valid duplicate → RESOLVED, verified",
+      "detail": "HTTP 200 · RESOLVED · policy APPROVE · gateway ACCEPTED · verified true"
+    },
+    {
+      "ok": true,
+      "name": "refund amount comes from the records",
+      "detail": "refunded 8999 minor = charge 8999 minor (simulated)"
+    },
+    {
+      "ok": true,
+      "name": "4 #48294 unsafe request → ESCALATED, no execution",
+      "detail": "HTTP 200 · ESCALATED · policy DENY · action none"
+    },
+    {
+      "ok": true,
+      "name": "5 #48293 already refunded → CLOSED_NO_ACTION, no refund",
+      "detail": "HTTP 200 · CLOSED_NO_ACTION · policy NO_ACTION · action none"
+    },
+    {
+      "ok": true,
+      "name": "6 Audit evidence on the refund",
+      "detail": "16 events · AI calls, policy + pre-execution revalidation, gateway, read-back · seq contiguous"
+    },
+    {
+      "ok": true,
+      "name": "audit on the escalation and no-action cases",
+      "detail": "10 and 10 events · no gateway call recorded"
+    },
+    {
+      "ok": true,
+      "name": "7 Free text without operator token is refused",
+      "detail": "HTTP 403"
+    },
+    {
+      "ok": true,
+      "name": "altered demo message is refused",
+      "detail": "HTTP 403"
+    },
+    {
+      "ok": true,
+      "name": "GET /cases is not allowed",
+      "detail": "HTTP 405"
+    },
+    {
+      "ok": true,
+      "name": "repeat run uses a fresh world (no double refund across runs)",
+      "detail": "HTTP 200 · RESOLVED · new case id"
+    },
+    {
+      "ok": true,
+      "name": "8 Real model: health reports vllm mode",
+      "detail": "aiMode=vllm · model=DeepSeek-V4-Flash"
+    },
+    {
+      "ok": true,
+      "name": "#48291 AI calls used the remote model",
+      "detail": "2 calls · adapters vllm:DeepSeek-V4-Flash"
+    },
+    {
+      "ok": true,
+      "name": "#48294 AI calls used the remote model",
+      "detail": "2 calls · adapters vllm:DeepSeek-V4-Flash"
+    },
+    {
+      "ok": true,
+      "name": "#48293 AI calls used the remote model",
+      "detail": "2 calls · adapters vllm:DeepSeek-V4-Flash"
+    }
+  ]
+}

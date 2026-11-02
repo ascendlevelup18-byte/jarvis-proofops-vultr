@@ -1,0 +1,38 @@
+{
+    "capturedAt":  "2026-10-17T21:00:08.9647907Z",
+    "baseUrl":  "https://developer.amd.com.cn/radeon/api/v1",
+    "model":  "DeepSeek-V4-Flash",
+    "timeoutMs":  30000,
+    "understandingModel":  "DeepSeek-V4-Flash",
+    "structuredOutput":  "json_object",
+    "runId":  "tf-2",
+    "gitHead":  "da409c0e62491d23337168aadba6160295b03861",
+    "gitDirty":  true,
+    "startup":  {
+                    "mode":  "vllm",
+                    "model":  "DeepSeek-V4-Flash",
+                    "understandingModel":  "DeepSeek-V4-Flash",
+                    "endpoint":  "https://developer.amd.com.cn/radeon/api/v1",
+                    "structuredOutput":  "json_object",
+                    "understandingStructuredOutput":  "json_object",
+                    "maxRetries":  1,
+                    "modelListed":  true,
+                    "probes":  {
+                                   "understanding":  "ok",
+                                   "decision":  "ok"
+                               },
+                    "promptVersions":  {
+                                           "understanding":  "261775476c4eb4c96c9059ecc32b9500a30d5b31fa0511d3601e11958e92ccec",
+                                           "decision":  "e7b62683b61afe6b13ecffa65427c0fb3597d7ff0cff894ebe7a47fe5cf03f26"
+                                       },
+                    "startupMs":  11777
+                },
+    "startupGate":  true,
+    "demoVerifyExit":  0,
+    "demoEvidence":  "evals/results/demo-evidence-live-20261017T210008Z.json",
+    "benchSkipped":  "DemoOnly",
+    "envCleared":  true,
+    "keyLeakFiles":  0,
+    "exitCode":  0,
+    "apiLogDir":  "C:\\Users\\xc\\AppData\\Local\\Temp\\jarvis-live-20261017T210008Z"
+}
