@@ -1,6 +1,6 @@
 # ProofOps in the shared Supabase project: migration, RLS and recovery plan
 
-Status: **draft for owner approval. Nothing has been written to any database.**
+Status: **draft for owner approval. Nothing has been written to the shared database.** Revision 2 (2 Nov 2026) fixes A1 to A4. It is tested only on a disposable local Postgres 17.11; see `prep/MIGRATION-REVIEW.md`.
 Project: `jarvis-actiii-cloud` (ref `bxjveqmdcnhvlzuotode`, ap-south-1, Postgres 17).
 
 ## 1. What the read-only inspection found (2 Nov 2026)
@@ -32,30 +32,27 @@ Project: `jarvis-actiii-cloud` (ref `bxjveqmdcnhvlzuotode`, ap-south-1, Postgres
 - **How RLS works here.** The API authenticates the operator itself, then sets `proofops.actor_id` per transaction. Policies allow only rows in workspaces where that actor is a member with the right role (viewer, operator, approver, owner).
   - This stops cross-workspace reads and writes caused by query bugs.
   - It does not stop a fully compromised API, which could set any actor. That is inherent to one backend identity, and it is stated here rather than overclaimed.
-- **No delete grants anywhere.** Append-only tables also refuse UPDATE and DELETE by trigger, even for the owner. `audit_events` carries a hash chain (`prev_hash`, `hash`) computed by the API.
+- **No delete grants anywhere.** Append-only tables also refuse UPDATE and DELETE by trigger, even for the owner.
+- **The audit hash chain is computed by the database.** `prev_hash` and `hash` are set by a trigger, and any values the caller supplies are ignored.
+- **Task status changes only through `proofops.transition_task`.** A trigger enforces the allowed transitions for every role. Reaching `completed` needs an approval on record, a started run, the `verifying` step, passing verification evidence, and every run ended and destroyed.
+- **Quotas change only through `proofops.consume_quota`,** which can only increase usage.
+- **Sandbox image and limits are fixed when the run is created,** within caps the database checks.
 - **Evidence bytes** (screenshots, DOM, HAR) stay on the Vultr side. The database stores only the SHA-256 and a storage reference.
 
 ## 3. Proof that the migration touches only ProofOps
 - **The file is** `prep/proofops-db/0001_proofops_schema.sql`, run as a single transaction.
 - **Every statement is one of:**
   - creating the two ProofOps roles
-  - granting `proofops_owner` to `postgres`
+  - a temporary `postgres` membership in `proofops_owner`, granted and revoked inside the same transaction
+  - default-privilege revokes that apply only to objects `proofops_owner` creates
   - creating the schema
   - creating, granting, revoking or setting policy on an object qualified `proofops.`
 - **No statement names `public`, `private`, `auth`, `storage` or an ACT III object.**
-- **Mechanical check before applying:** a grep of the file for `public\.|private\.|auth\.|storage\.|drop |truncate|alter (table|function) (public|private)` must return nothing except the `revoke ... from public` pseudo-role lines.
-- **Security tests** (`prep/proofops-db/security_test.sql`) run inside a transaction that always rolls back:
-  - **T1:** ACT III's `anon`, `authenticated` and `service_role` have no access to `proofops`.
-  - **T2:** `proofops_app` has no grants outside `proofops`.
-  - **T3:** no ProofOps role is superuser or BYPASSRLS.
-  - **T4:** RLS is on for every ProofOps table.
-  - **T5:** no ACT III policy mentions a ProofOps role.
-  - **T6:** cross-workspace reads are blocked.
-  - **T7:** a viewer cannot create tasks.
-  - **T8 and T9:** `public` tables and `auth.users` are unreachable from `proofops_app`.
-  - **T10:** events cannot be changed.
-  - **T11:** nothing can be deleted.
-- **ACT III regression:** rerun ACT III's own `reference/act3/supabase/tests/security_test.sql` after applying. It must still pass 46/46.
+- **Tested on a disposable local Postgres 17.11** that mimics Supabase's role layout. Results are in `prep/proofops-db/local-test/RESULT-20261102.txt`:
+  - ACT III's own 46 database security checks pass before and after.
+  - All 55 ProofOps checks in `security_test.sql` pass.
+  - A fingerprint of every ACT III policy, grant, function, membership, default privilege and setting is identical before the migration, after it, and after rollback.
+- **Before applying to the shared project:** rerun ACT III's `reference/act3/supabase/tests/security_test.sql`. It must still pass 46/46.
 
 ## 4. Order of operations (each step needs the owner's go-ahead)
 1. **Owner unpauses** the project in the dashboard.
@@ -64,7 +61,7 @@ Project: `jarvis-actiii-cloud` (ref `bxjveqmdcnhvlzuotode`, ap-south-1, Postgres
 4. **Apply `0001_proofops_schema.sql`** as one transaction.
 5. **Run `security_test.sql`** (always rolled back), then ACT III's security test. Stop and roll back if anything fails.
 6. **Owner enables the login** in the Supabase SQL editor, typing the password there so it never passes through chat, git or a script: `alter role proofops_app login password '<generated>' connection limit 10;`. The connection string then goes into the Vultr VM's environment only.
-7. **Seed one workspace and its members** with the migration user.
+7. **Seed one workspace, its members and quotas** in an admin session. That is one transaction that grants `proofops_owner` to `postgres`, runs `set local role proofops_owner`, inserts the rows, resets the role and revokes the membership.
 
 ## 5. Recovery and rollback
 - **Undo:** `0001_proofops_schema.down.sql` drops schema `proofops` (cascade is confined to that schema) and the two roles. ACT III is untouched.
@@ -75,7 +72,7 @@ Project: `jarvis-actiii-cloud` (ref `bxjveqmdcnhvlzuotode`, ap-south-1, Postgres
 | Risk | Effect | Mitigation |
 |---|---|---|
 | **Auto-pause** | The project pauses after inactivity (it is paused now). The ProofOps demo would break during judging. | ProofOps traffic keeps it active. During judging, check the status daily and keep a local fallback store in the API. If this is unacceptable, use a separate project. |
-| Shared admin | The `postgres` user and the ACT III service key are project-wide. `postgres` can read ProofOps. | `service_role` gets no schema access. The ProofOps API never holds either credential. |
+| Shared admin | `postgres` keeps ADMIN OPTION on the ProofOps roles, so it can grant itself access at any time. The platform superuser can read everything. | No standing access: `postgres` must grant itself access explicitly, which is visible in the role catalog. `service_role` gets no schema access. The ProofOps API never holds either credential. |
 | Shared Auth/JWT | Same JWT secret and auth users. | ProofOps does not use Supabase Auth or the Data API at all. |
 | Quotas, disk, connections | Free plan: 500 MB database, shared connection pool. | Evidence bytes stay off the database. Connection limit 10 on `proofops_app`. |
 | Backups | Project backups cover both apps together. | Per-schema `pg_dump` for ProofOps. Never restore the project to undo ProofOps. |

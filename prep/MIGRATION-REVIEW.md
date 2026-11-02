@@ -1,106 +1,134 @@
-# Review of `prep/proofops-db/0001_proofops_schema.sql`
+# Review of `prep/proofops-db/0001_proofops_schema.sql`, revision 2
 
-Status: **PENDING owner approval. Not executed.** Reviewed 2 Nov 2026 against Postgres 17 semantics and the committed ACT III migrations. The live database could not be inspected because the project is paused.
+Status: **PENDING owner approval. Never run against the shared Supabase project.** Revision 2 (2 Nov 2026) fixes A1 to A4 from revision 1. It also fixes two more issues that testing found (B1, B2). It was tested on a disposable local Postgres 17.11, the same version as the Supabase project.
 
-## 1. Every SQL operation, in order
-| # | Operation | Scope |
-|---|---|---|
-| 1 | `create role proofops_owner nologin noinherit nobypassrls` | **Cluster-wide** (see §2) |
-| 2 | `create role proofops_app nologin noinherit nobypassrls` | **Cluster-wide** |
-| 3 | `grant proofops_owner to postgres` | **Changes an existing role's memberships** (see §4) |
-| 4 | `create schema proofops authorization proofops_owner` | New schema |
-| 5 | `set local role proofops_owner` | This transaction only |
-| 6 | `revoke all on schema proofops from public` | proofops only |
-| 7–9 | `alter default privileges for role proofops_owner in schema proofops revoke all on tables/functions/sequences from public` | proofops only |
-| 10 | `create function proofops.actor()` | proofops |
-| 11 | `create type proofops.workspace_role`, `create type proofops.task_status` | proofops |
-| 12 | `create table` × 10: workspaces, workspace_memberships, tasks, sandbox_runs, execution_events, evidence, approvals, audit_events, model_requests, usage_quotas | proofops |
-| 13 | `create function proofops.has_role`, `proofops.is_member` (SECURITY DEFINER), `proofops.forbid_change` | proofops |
-| 14 | 4 × `create trigger … append_only` on execution_events, evidence, approvals, audit_events | proofops |
-| 15 | 7 × `create index` | proofops |
-| 16 | `enable row level security` on all 10 tables; `force` on 9, not on workspace_memberships | proofops |
-| 17 | 21 × `create policy … to proofops_app` | proofops |
-| 18 | `grant usage`, `grant execute` on 3 functions, and table grants to proofops_app (select/insert/update; **no delete**) | proofops |
-| 19 | `reset role` | — |
-| 20 | `revoke all on schema proofops from anon, authenticated, service_role` | proofops (no-op by design, stated explicitly) |
+## Test result (disposable local database)
+Runner: `prep/proofops-db/local-test/run-local.mjs`. Full log: `prep/proofops-db/local-test/RESULT-20261102.txt`.
 
-Everything runs as one `begin … commit`. Any failure keeps nothing.
+The runner builds a Supabase-like role layout:
+- `postgres` is a non-superuser with CREATEROLE and BYPASSRLS
+- `anon`, `authenticated` and `service_role` roles
+- a stub `auth` schema
+- `pgcrypto` in an `extensions` schema
 
-## 2. Cluster-wide objects
-- **Roles are cluster-wide in Postgres.** The two roles exist for every database in the Supabase instance, not just this schema. They appear in `pg_roles`, which any role, ACT III's included, can read.
-- **Neither role can log in after the migration.** Login is a later, separate step that the owner performs.
-- **Nothing else is cluster-level.** There is no `ALTER SYSTEM`, no `ALTER DATABASE`, no `ALTER ROLE` on existing roles, no extension, no event trigger and no publication.
-
-## 3. Search path and schema permissions
-- Every function sets `search_path = ''` and fully qualifies names, which blocks search-path hijacking.
-- The table defaults use `gen_random_uuid()` from pg_catalog. That is built in since Postgres 13 and does not need pgcrypto.
-- `public` (the pseudo-role) loses all rights on the schema. Default privileges are revoked before any object is created, so no object ever has a public grant, including the functions.
-- `proofops_app` gets `USAGE` on proofops only. It gets no `CREATE`, so it cannot add objects.
-- The custom setting `proofops.actor_id` is set per transaction with `set local`. It is not a server setting and does not persist.
-
-## 4. Impact on existing ACT III roles
-- **`postgres` gains membership in `proofops_owner`** (operation 3).
-  - Effect: the migration user can create objects as the owner, and later administer the schema.
-  - `postgres` already administers the whole project, so this adds no new reach into ACT III. It does change the membership list of an existing role.
-  - **Recommended amendment A1:** revoke the membership at the end of the migration, then re-grant it only for later admin work and for the rollback. Since Postgres 16, the creator keeps ADMIN OPTION on the role, so it can re-grant itself without a superuser.
-- **`anon`, `authenticated` and `service_role`** never receive anything. Operation 20 only confirms that. Their ACT III grants and policies are not referenced.
-- **`authenticator`, `supabase_admin` and the other platform roles** are not touched.
-
-## 5. RLS and least-privilege guarantees
-**What is guaranteed:**
-- RLS applies to `proofops_app` on all 10 tables, because it is neither the owner nor BYPASSRLS.
-- RLS is forced on 9 tables, so even the owner role is filtered there.
-- The append-only triggers block UPDATE and DELETE on events, evidence, approvals and audit for everyone except someone who disables the trigger (owner or superuser).
-- There is no DELETE grant on any table.
-- Workspaces and memberships are read-only to the app.
-
-**What is not guaranteed:**
-- **A compromised backend is not stopped.** `proofops_app` chooses the actor id, so a compromised backend can act as any actor. RLS protects against query bugs, not against takeover of the backend.
-- **The audit hash chain is not enforced by the database.** The API computes it, and the database only stores it.
-
-**Weaknesses found in this review (amendments recommended before applying):**
-- **A2. `usage_quotas` update is too broad.** Any member, including a viewer, could reset `used_today`. Fix: replace the update grant with a SECURITY DEFINER `proofops.consume_quota(ws, resource, n)` that can only increase usage.
-- **A3. `tasks` update is too broad.** An operator or approver can update any column, including setting `status = 'completed'` directly and skipping verification. Fix: drop the update grant and move state changes into a SECURITY DEFINER `proofops.transition_task(task, to_status)` that enforces the allowed transitions and requires an `evidence` row with a passing verdict before `completed`.
-- **A4. `sandbox_runs` update is too broad.** Restrict it with column-level `update (started_at, ended_at, exit_reason, destroyed)` grants.
-
-## 6. Shared database settings
-- **None are modified.** There is no change to `postgresql.conf`, `ALTER DATABASE … SET`, Auth, JWT, Data API exposed schemas, network restrictions, pooler settings or project plan.
-- **Platform reaction to DDL:** Supabase's own DDL event triggers will fire, as they do for any DDL. These are the PostgREST schema-cache reload and the pg_graphql placeholder. Since `proofops` is not exposed and grants nothing to API roles, nothing becomes reachable.
-- **To verify after unpausing:** `inspect_readonly.sql` lists every event trigger. Any trigger that automatically grants on new tables or schemas would need review before applying.
-
-## 7. The 11 isolation tests (`security_test.sql`, always rolled back)
-| # | Test |
+| Step | Result |
 |---|---|
-| T1 | `anon`, `authenticated` and `service_role` have no `USAGE` on proofops |
-| T2 | `proofops_app` has no table grants outside proofops and cannot use `private` |
-| T3 | Neither ProofOps role is superuser or BYPASSRLS |
-| T4 | RLS is enabled on every proofops table, and forced on all but workspace_memberships |
-| T5 | No ACT III policy names a ProofOps role |
-| T6 | An actor in workspace B sees zero tasks from workspace A |
-| T7 | A viewer cannot create a task |
-| T8 | `proofops_app` cannot read `public.organizations` |
-| T9 | `proofops_app` cannot read `auth.users` |
-| T10 | Execution events cannot be updated |
-| T11 | Tasks cannot be deleted |
+| ACT III's 3 migrations | Applied |
+| ACT III database security tests, before ProofOps | **46/46** |
+| ProofOps migration | Applied in one transaction |
+| ACT III fingerprint (every policy, grant, function body and ACL, membership, role attribute, default privilege, database setting and RLS flag outside proofops) | **Identical** before and after |
+| ProofOps tests (`security_test.sql`) | **55/55** |
+| ACT III security tests, after ProofOps | **46/46** |
+| Rollback (`.down.sql`) | 0 proofops schemas and 0 ProofOps roles left; ACT III fingerprint identical to the original |
+| Re-apply after rollback, then retest | Applied; 55/55 |
 
-After applying, ACT III's own `security_test.sql` (46 checks) must still pass. Amendments A2 to A4 would add three tests: a viewer cannot reset a quota, a task cannot jump to completed, and a run's limits cannot be changed.
-
-## 8. Rollback limitations
-- **The down migration destroys all ProofOps data.** Export first with `pg_dump --schema=proofops`.
-- **`drop role` fails while `proofops_app` has open connections.** Stop the Vultr API first.
-- **`drop role` fails if either role was granted anything outside proofops later.** None should be. T2 and T5 check this.
-- **Project backups and PITR snapshots taken after the migration contain proofops.** Restoring the project to an earlier point would also roll back ACT III, so it is never a ProofOps rollback method.
-- **Free-plan backups:** the free plan may have no PITR, so the per-schema dump is the only selective backup.
-
-## 9. Any chance of cross-application access
-| Direction | Possible? | Why |
+## Fixes
+| Finding | Fix | Tests |
 |---|---|---|
-| ACT III browser (anon or authenticated JWT) → proofops | No | No schema usage; proofops not exposed in the Data API |
-| ACT III gateway (`service_role` key) → proofops | No | `service_role` has no usage on proofops |
-| ProofOps backend → ACT III tables or auth | No | No grants outside proofops (T2, T8, T9) |
-| Project admin (`postgres`, dashboard, `supabase_admin`) → proofops | **Yes** | Inherent to sharing a project; the same people already administer ACT III |
-| Leaked `postgres` password or a dashboard compromise | **Yes, both apps** | Shared blast radius; only a separate project removes it |
-| ACT III org membership → ProofOps rights | No | ProofOps identities are separate; no foreign key to `auth.users` or `public.memberships` |
+| **A1. `postgres` kept a membership in `proofops_owner`** | The membership is now granted with `set true, inherit false` only for the length of the migration transaction, then revoked. Afterwards `postgres` holds only the ADMIN OPTION that Postgres 16+ gives automatically to a non-superuser who creates a role. | A1a: no INHERIT or SET membership remains. A1b: `postgres` cannot read ProofOps tables without an explicit admin session. |
+| **A2. A viewer could reset quotas** | The UPDATE grant on `usage_quotas` is removed. Usage changes only through `proofops.consume_quota(ws, resource, n)`, which requires owner or operator and n from 1 to 100000. It locks the row, resets usage only on a new day, refuses beyond `daily_max`, and refuses when no quota row exists. | A2a–A2h |
+| **A3. A task could be marked completed without verification** | The UPDATE grant on `tasks` is removed. Status changes only through `proofops.transition_task`, which checks the actor's role for the target status and writes an execution event and an audit event. A trigger enforces the rules for every role, the owner included (listed below this table). Approvals are accepted only while the task awaits approval; evidence only while it is running or verifying. | A3a–A3m, W1–W3 |
+| **A4. Sandbox limits could be edited** | The backend can update only `started_at`, `ended_at`, `exit_reason` and `destroyed` (column grants). A trigger keeps task, workspace, image and limits fixed for every role, the owner included (listed below this table). Limits must sit within caps checked by the database. | A4a–A4h |
+| **B1 (found in testing). PUBLIC could execute every ProofOps function** | Postgres grants EXECUTE on functions to PUBLIC by default, and a per-schema default-privilege rule cannot remove that, so revision 1's revoke did nothing. Calls were still blocked because PUBLIC has no access to the schema, but the grant existed. Now it is revoked by a default rule scoped to objects `proofops_owner` creates, plus an explicit `revoke execute on all functions`. | I6 |
+| **B2 (found in testing). Cross-workspace references** | Revision 1 let a row in workspace A reference a task in workspace B. Every child table now uses a composite foreign key `(task_id, workspace_id)`. | I10 |
 
-## Recommendation
-Apply only after amendments A1 to A4 are folded into the draft, with Gemini's security review reconciled, and after the read-only inspection confirms the live state. If the shared admin blast radius or auto-pause is not acceptable, a separate Supabase project removes both, at the cost of one more project to manage.
+**Task rules the trigger enforces (A3):**
+- A task must start as `planned`.
+- Its goal, plan and policy version can never change.
+- Status follows only these moves:
+  - `planned` → `awaiting_approval` or `cancelled`
+  - `awaiting_approval` → `approved`, `blocked` or `cancelled`
+  - `approved` → `running` or `cancelled`
+  - `running` → `verifying`, `blocked` or `failed`
+  - `verifying` → `completed`, `failed` or `blocked`
+- `approved` needs the latest approval decision to be approve.
+- `running` needs a started run.
+- `completed` needs passing verification evidence, and every run for the task ended and destroyed.
+
+**Sandbox run rules the trigger enforces (A4):**
+- Task, workspace, image and limits never change.
+- A run can only be created for an approved or running task, and must start unstarted.
+- `started_at` and `ended_at` are each set once, in order.
+- `destroyed` can never go back to false.
+- Limits must sit within these caps:
+  - timeout 1 s to 300 s
+  - memory 64 to 4096 MB
+  - at most 4 CPUs
+  - 16 to 1024 processes
+  - a network allowlist must be present
+
+Also changed from revision 1:
+- **The audit hash chain is computed by the database** (tests I17a, I17b), and every task status change writes to it.
+- **No table, tasks and sandbox runs included, can be deleted,** even by the owner.
+
+## Every SQL operation (revision 2)
+1. **Create roles.** `create role proofops_owner` and `create role proofops_app`, both with nologin, noinherit and nobypassrls. These are **cluster-wide.**
+2. **Temporary membership.** `grant proofops_owner to postgres with inherit false, set true`. It is revoked at step 14.
+3. **Schema.** `create schema proofops authorization proofops_owner`, then `set local role proofops_owner`.
+4. **Lock down defaults.**
+   - `revoke all on schema proofops from public`.
+   - `alter default privileges for role proofops_owner revoke execute on functions from public`, and the same for `usage on types`. These are role-level rules, so they affect only objects created by `proofops_owner`.
+5. **Types.** 2 enum types, `workspace_role` and `task_status`.
+6. **Tables.** 10 tables with check constraints and composite foreign keys, plus 7 indexes.
+7. **Membership functions.** `has_role` and `is_member` (SECURITY DEFINER).
+8. **Trigger functions.** `forbid_change`, `tasks_guard`, `sandbox_runs_guard` and `task_phase_guard` (invoker), plus `audit_chain` (SECURITY DEFINER).
+9. **Triggers.** 11 in total:
+   - append-only on 4 tables
+   - no-delete on tasks and on sandbox_runs
+   - the tasks guard
+   - the runs guard
+   - 2 phase guards
+   - the audit chain
+10. **Write-path functions.** `transition_task` and `consume_quota` (SECURITY DEFINER).
+11. **RLS.** Enabled on all 10 tables, with 18 policies, all `to proofops_app`.
+12. **Grants to `proofops_app` only:**
+    - schema usage, and usage on the 2 types
+    - execute on 5 functions
+    - select on all proofops tables
+    - insert on 7 tables
+    - column-level update on `sandbox_runs`
+    - an explicit `revoke execute on all functions … from public`
+13. **Explicit revoke.** `revoke all on schema proofops from anon, authenticated, service_role`, a no-op by design. Then `reset role`.
+14. **Remove the temporary membership.** `revoke proofops_owner from postgres`.
+
+## Answers to the review questions
+- **Cluster-wide roles:** yes, the two roles exist cluster-wide and appear in `pg_roles`. They have no login, no superuser, no CREATEROLE, no CREATEDB, no REPLICATION and no BYPASSRLS (test I3). Login is enabled later by the owner, separately.
+- **Search path:** every function sets `search_path = ''` and names every object with its schema (I6). `pg_catalog` functions are written with their schema inside the definer functions.
+- **Schema permissions:** only `proofops_app` has USAGE, and nobody but the owner has CREATE (I1, I2).
+- **Default privileges:** they only restrict `proofops_owner`'s own objects, and it owns nothing outside `proofops` apart from Postgres's automatic TOAST tables (I7).
+- **Security-definer risk:**
+  - The 5 definer functions run as `proofops_owner`. That role is not BYPASSRLS and has no grants outside `proofops`, so a bug in one of them cannot reach ACT III.
+  - None is executable by PUBLIC. Only `proofops_app` can call them.
+  - The two write-path functions check the actor's workspace role before acting.
+- **Impact on existing ACT III roles:**
+  - `anon`, `authenticated`, `service_role` and `authenticator` gain nothing (I1).
+  - `postgres` ends with ADMIN OPTION only (A1a). The fingerprint shows no other role, membership or grant changed.
+- **Shared settings:** none. There is no `ALTER SYSTEM`, `ALTER DATABASE`, change to existing roles, extension, event trigger, publication, or change to Auth, API or pooler settings. The fingerprint includes `pg_db_role_setting`.
+- **RLS:**
+  - RLS is enabled on all tables, so `proofops_app` is always subject to it.
+  - It is **not forced**, because the definer functions run as the owner and must see every row to enforce the rules. The owner is constrained instead by the triggers above, which apply to every role.
+  - With no actor set, the backend sees no rows (I12).
+
+## Remaining risks
+1. **A compromised backend can pick any actor.**
+   - It could create a task as an operator actor and approve it as an approver actor.
+   - The database enforces the order and the evidence, but separation of duties is only as strong as the backend's operator authentication.
+   - **Recommendation for kickoff:** a separate `proofops_verifier` role. Only that role could insert `verification` evidence, from the independent verifier process, so the agent backend cannot certify its own work.
+2. **The verification verdict is asserted, not re-checked.** The database checks that passing evidence exists and is hash-addressed, not that the verifier was honest. Evidence bytes live on the Vultr side.
+3. **`postgres` can always grant itself access** through its ADMIN OPTION, and the platform superuser sees everything. This comes with sharing a project: anyone holding the project's `postgres` password can read ProofOps, and the reverse holds too.
+4. **The local simulation is not Supabase.** These still need checking on the real project:
+   - Supabase's `supautils` restrictions on role statements
+   - its event triggers
+   - the `createrole_self_grant` setting
+   - whether `postgres` there behaves exactly like the simulated non-superuser
+
+   `inspect_readonly.sql` covers the event triggers and settings after unpausing. A faithful dry run would need a separate free Supabase project (owner approval required) or Supabase branching (paid).
+5. **Auto-pause** can take the demo down during judging. The project is paused now.
+6. **Rollback limits:**
+   - It destroys ProofOps data, so dump it first.
+   - It fails while `proofops_app` has open connections.
+   - Project-level backups and PITR cover both apps, so they are never a ProofOps undo.
+7. **The quota day is the database's `current_date`** (UTC on Supabase).
+
+## Not yet received
+Gemini's independent security findings. I'll reconcile them against this revision when they arrive.
