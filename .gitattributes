@@ -1,2 +1,3 @@
 # Auto detect text files and perform LF normalization
-* text=auto
+# eol=lf keeps checkouts byte-identical to the committed files, so pinned evidence hashes match on Windows.
+* text=auto eol=lf
