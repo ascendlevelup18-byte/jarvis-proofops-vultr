@@ -5,7 +5,7 @@
 ## Prior work disclosed
 JARVIS ProofOps is a new commerce QA and secure browser-execution product developed for Vultr Agent Rush, built on selected reusable foundations from our earlier JARVIS engineering work. It is not a clean-room implementation, and it is not a renamed ACT III.
 
-This repository starts from a sanitized snapshot of the same author's earlier project, **JARVIS ACT III** (https://github.com/ascendlevelup18-byte/jarvisACTIII, commit `c69ca2c`). Every inherited file, its source commit and checksum are listed in [REUSE-LEDGER.md](REUSE-LEDGER.md). The first commit contains only that inherited foundation; all later commits are new work. Refund-specific ACT III features will be removed at kickoff.
+This repository starts from a sanitized snapshot of the same author's earlier project, **JARVIS ACT III** (https://github.com/ascendlevelup18-byte/jarvisACTIII, commit `c69ca2c`). Every inherited file, its source commit and checksum are listed in [REUSE-LEDGER.md](REUSE-LEDGER.md). The disclosed import is commit `a6ac809`, following initial commit `ac9b087`. Later commits include pre-kickoff preparation and must not all be represented as functionality developed during the event. Refund-specific ACT III features will be removed at kickoff.
 
 ## Isolation from JARVIS ACT III
 - Separate repository and Git history; no remote points at `jarvisACTIII`.
