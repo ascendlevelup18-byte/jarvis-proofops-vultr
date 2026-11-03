@@ -28,6 +28,8 @@ export interface RunConfig {
   deployment: string; // e.g. "local-windows" or "vultr:<instance-id>"
   maxSteps?: number;
   wallClockMs?: number;
+  /** External cancellation (operator pressed Cancel). */
+  signal?: AbortSignal;
   maxModelCalls?: number;
 }
 
@@ -44,7 +46,7 @@ export interface StepRecord {
 
 export interface RunResult {
   runId: string;
-  status: "completed" | "failed" | "timed_out";
+  status: "completed" | "failed" | "timed_out" | "cancelled";
   verdict: VerifierReport["verdict"];
   report: VerifierReport;
   evidenceDir: string;
@@ -120,6 +122,8 @@ export async function runScenario(cfg: RunConfig): Promise<RunResult> {
   const modelCalls: ModelCallRecord[] = [];
   let worker: WorkerHandle | null = null;
   let status: RunResult["status"] = "completed";
+  let stopReason: "timed_out" | "cancelled" | null = null;
+  let stopTimer: NodeJS.Timeout | undefined;
   let error: string | null = null;
   let dom: { subtotal: string | null; discount: string | null; total: string | null; checkoutMarker: boolean } | null = null;
   let cleanup = { workerGone: null as boolean | null, detail: "not started" };
@@ -138,12 +142,24 @@ export async function runScenario(cfg: RunConfig): Promise<RunResult> {
         : { kind: "sandbox", runId, socketDir: socketDir!, limits: cfg.worker.limits },
     );
     ev("worker.launched", { kind: worker.kind, container: worker.containerName, args: worker.launchArgs });
+    // Hard stop: on wall-clock expiry or cancellation the worker is destroyed immediately, which fails any
+    // in-flight call; the run then records the real stop reason instead of waiting for a step boundary.
+    const w = worker;
+    const hardStop = (reason: "timed_out" | "cancelled") => {
+      if (stopReason) return;
+      stopReason = reason;
+      ev(reason === "timed_out" ? "run.wall_clock_expired" : "run.cancel_requested", {});
+      void w.destroy();
+    };
+    stopTimer = setTimeout(() => hardStop("timed_out"), Math.max(0, deadline - Date.now()));
+    if (cfg.signal?.aborted) hardStop("cancelled");
+    cfg.signal?.addEventListener("abort", () => hardStop("cancelled"), { once: true });
     const started = await worker.call<Record<string, unknown>>("start", { startUrl: scope.base }, 45_000);
     ev("worker.started", started);
 
     let consecutiveInvalid = 0;
     for (let step = 0; step < maxSteps; step++) {
-      if (Date.now() > deadline) { status = "timed_out"; error = "wall clock limit reached"; break; }
+      if (stopReason) break;
       if (modelCalls.length >= maxModelCalls) { status = "failed"; error = "model call budget exhausted"; break; }
       const obs = await worker.call<Observation>("observe");
       await put(`observations/step-${String(step).padStart(2, "0")}.json`, JSON.stringify(obs, null, 2));
@@ -187,6 +203,7 @@ export async function runScenario(cfg: RunConfig): Promise<RunResult> {
     }
 
     // 4. Verification reads by the control plane (not the model): final page, then the cart.
+    if (stopReason) throw new Error(stopReason === "timed_out" ? "wall clock limit reached" : "cancelled by operator");
     try {
       const finalRead = await worker.call<{ values: Record<string, string | null> }>("read", { selectors: { marker: spec.selectors.checkoutMarker } });
       await shot("final");
@@ -203,11 +220,12 @@ export async function runScenario(cfg: RunConfig): Promise<RunResult> {
     const netlog = await worker.call<{ entries: unknown[] }>("netlog").catch(() => ({ entries: [] }));
     await put("worker-network.json", JSON.stringify(netlog.entries, null, 2));
   } catch (e) {
-    status = "failed";
-    error = (e as Error).message.slice(0, 300);
+    status = stopReason ?? "failed";
+    error = stopReason === "timed_out" ? "wall clock limit reached" : stopReason === "cancelled" ? "cancelled by operator" : (e as Error).message.slice(0, 300);
     ev("run.error", { error });
   } finally {
     // 5. Teardown is unconditional and confirmed.
+    clearTimeout(stopTimer);
     if (worker) {
       cleanup = await worker.destroy();
       await put("worker-events.json", JSON.stringify(worker.events, null, 2));

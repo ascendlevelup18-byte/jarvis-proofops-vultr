@@ -69,7 +69,10 @@ const cfg: RunConfig = {
   evidenceRoot: arg("evidence", sandbox ? "evidence" : "evidence-local")!,
   codeSha,
   deployment: arg("deployment", sandbox ? "vultr" : "local-windows")!,
+  ...(arg("wall-ms") ? { wallClockMs: Number(arg("wall-ms")) } : {}),
 };
+const cancelAfter = arg("cancel-after-ms");
+if (cancelAfter) cfg.signal = AbortSignal.timeout(Number(cancelAfter)); // simulated operator cancel
 
 try {
   const r = await runScenario(cfg);

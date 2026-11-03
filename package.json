@@ -23,7 +23,8 @@
     "proofops:typecheck": "tsc -p apps/proofops",
     "proofops:test": "node --test apps/proofops/test/*.test.ts",
     "proofops:check": "npm run proofops:typecheck && npm run proofops:test",
-    "proofops:run": "node apps/proofops/src/cli.ts"
+    "proofops:run": "node apps/proofops/src/cli.ts",
+    "proofops:e2e": "node --test --test-concurrency=1 apps/proofops/e2e/*.test.ts"
   },
   "dependencies": {
     "zod": "^4.6.5"
