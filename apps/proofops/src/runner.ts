@@ -33,6 +33,8 @@ export interface RunConfig {
   ordersExpected?: number;
   /** Operator approval for consequential steps. Returns a signed one-time token, or null when refused or timed out. */
   approval?: (req: ApprovalRequest) => Promise<string | null>;
+  /** Test hook: receives the worker handle right after launch. */
+  onWorker?: (w: WorkerHandle) => void;
   /** Live feed for the UI: every event and every step record as it happens. */
   observer?: (e: { kind: "event" | "step"; data: Record<string, unknown> }) => void;
   planner: Planner;
@@ -96,6 +98,15 @@ export async function runScenario(cfg: RunConfig): Promise<RunResult> {
   const deadline = Date.now() + (cfg.wallClockMs ?? 120_000);
   const maxModelCalls = cfg.maxModelCalls ?? 14;
   const dir = join(cfg.evidenceRoot, runId);
+  // A run id is used once: never overwrite an earlier run's evidence.
+  try {
+    await mkdir(dir, { recursive: false });
+  } catch (e) {
+    if ((e as NodeJS.ErrnoException).code === "EEXIST") throw new Error(`evidence for ${runId} already exists; run ids are single-use`);
+    if ((e as NodeJS.ErrnoException).code !== "ENOENT") throw e;
+    await mkdir(cfg.evidenceRoot, { recursive: true });
+    await mkdir(dir, { recursive: false });
+  }
   await mkdir(join(dir, "screenshots"), { recursive: true });
   await mkdir(join(dir, "observations"), { recursive: true });
 
@@ -179,6 +190,7 @@ export async function runScenario(cfg: RunConfig): Promise<RunResult> {
         : { kind: "sandbox", runId, socketDir: socketDir!, limits: cfg.worker.limits },
     );
     ev("worker.launched", { kind: worker.kind, container: worker.containerName, args: worker.launchArgs });
+    cfg.onWorker?.(worker);
     // Hard stop: on wall-clock expiry or cancellation the worker is destroyed immediately, which fails any
     // in-flight call; the run then records the real stop reason instead of waiting for a step boundary.
     const w = worker;
@@ -344,6 +356,7 @@ export async function runScenario(cfg: RunConfig): Promise<RunResult> {
   }
 
   const report = verify({
+    runId,
     spec,
     dom,
     server,

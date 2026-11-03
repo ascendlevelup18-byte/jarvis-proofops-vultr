@@ -32,6 +32,8 @@ export interface WorkerHandle {
   readonly kind: LaunchSpec["kind"];
   readonly containerName: string | null;
   readonly launchArgs: string[];
+  /** OS process id of the launcher (worker process locally, docker client in the sandbox). */
+  readonly pid: number | undefined;
   call<T = unknown>(op: string, args?: Record<string, unknown>, timeoutMs?: number): Promise<T>;
   /** Kills the worker and confirms it is gone. Safe to call more than once. */
   destroy(): Promise<{ workerGone: boolean; detail: string }>;
@@ -107,6 +109,7 @@ export async function launchWorker(spec: LaunchSpec): Promise<WorkerHandle> {
 
   const handle: WorkerHandle = {
     kind: spec.kind,
+    pid: child.pid,
     containerName,
     launchArgs,
     events,

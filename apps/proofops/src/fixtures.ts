@@ -76,7 +76,8 @@ export function specIntact(spec: FrozenSpec): boolean {
 /** "$1,234.56" or "-$10.00" -> integer cents. Null when the text has no single unambiguous amount. */
 export function parseUsdCents(text: string | null | undefined): number | null {
   if (!text) return null;
-  const matches = [...text.matchAll(/(-)?\$\s?(\d{1,3}(?:,\d{3})*|\d+)\.(\d{2})/g)];
+  // Exactly two decimals: "$90.001" is not $90.00, it is unparseable.
+  const matches = [...text.matchAll(/(-)?\$\s?(\d{1,3}(?:,\d{3})*|\d+)\.(\d{2})(?!\d)/g)];
   if (matches.length !== 1) return null;
   const [, neg, whole, frac] = matches[0]!;
   const cents = Number(whole!.replaceAll(",", "")) * 100 + Number(frac);

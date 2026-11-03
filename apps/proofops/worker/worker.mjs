@@ -46,7 +46,9 @@ async function start({ startUrl }) {
       "--disable-sync", "--disable-features=MediaRouter,OptimizationHints,DialMediaRouteProvider", "--proxy-bypass-list=<-loopback>"],
     chromiumSandbox: !NO_SANDBOX,
   });
+  // A fresh, in-memory browser context per worker process: no profile directory, cookies or storage survive it.
   context = await browser.newContext({ viewport: { width: 1280, height: 800 }, serviceWorkers: "block", acceptDownloads: false, javaScriptEnabled: true });
+  log({ type: "worker.cookies_at_start", count: (await context.cookies()).length });
   page = await context.newPage();
   page.setDefaultTimeout(8_000);
   page.on("request", (r) => netlog.push({ at: new Date().toISOString(), kind: "request", method: r.method(), url: r.url().slice(0, 300) }));
@@ -204,4 +206,4 @@ rl.on("line", async (line) => {
 });
 rl.on("close", async () => { await browser?.close().catch(() => {}); process.exit(0); });
 // Variable NAMES only (never values), so tests can prove the environment is allow-listed.
-log({ type: "worker.ready", node: process.version, bridge: Boolean(SOCKET), envKeys: Object.keys(process.env).sort() });
+log({ type: "worker.ready", node: process.version, bridge: Boolean(SOCKET), profile: "ephemeral", envKeys: Object.keys(process.env).sort() });

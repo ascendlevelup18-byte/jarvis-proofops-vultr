@@ -113,6 +113,7 @@ test("policy denies out-of-scope, stale, unknown, malformed and consequential ac
 });
 
 const baseInput = (): VerifierInput => ({
+  runId: "r",
   spec: freezeSpec("normal"),
   dom: { subtotal: "$100.00", discount: "-$10.00", total: "$90.00", checkoutMarker: true },
   server: { sid: "a", runId: "r", mode: "normal", cart: { sku: "DEMO-001", quantity: 1 }, coupon: "SAVE10",

@@ -15,6 +15,8 @@ export interface Check {
 }
 
 export interface VerifierInput {
+  /** The run being judged; the store's server state must belong to it. */
+  runId: string;
   spec: FrozenSpec;
   dom: { subtotal: string | null; discount: string | null; total: string | null; checkoutMarker: boolean } | null;
   server: SessionState | null;
@@ -65,6 +67,11 @@ export function verify(i: VerifierInput): VerifierReport {
     serverCheck("server.subtotal", s.expected.subtotalCents, i.server?.totals, "subtotalCents"),
     serverCheck("server.discount", s.expected.discountCents, i.server?.totals, "discountCents"),
     serverCheck("server.total", s.expected.totalCents, i.server?.totals, "totalCents"),
+  );
+  commerce.push(
+    !i.server
+      ? { name: "server.session_bound", outcome: "INCONCLUSIVE", detail: "no server state" }
+      : { name: "server.session_bound", outcome: i.server.runId === i.runId ? "PASS" : "FAIL", expected: i.runId, observed: i.server.runId },
   );
   const cart = i.server?.cart;
   commerce.push(
