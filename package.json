@@ -19,7 +19,11 @@
     "web:dev": "npm run dev --prefix apps/web",
     "web:build": "npm run build --prefix apps/web",
     "web:typecheck": "npm run build --prefix apps/web",
-    "web:test": "node --test --experimental-strip-types apps/web/test/*.test.ts"
+    "web:test": "node --test --experimental-strip-types apps/web/test/*.test.ts",
+    "proofops:typecheck": "tsc -p apps/proofops",
+    "proofops:test": "node --test apps/proofops/test/*.test.ts",
+    "proofops:check": "npm run proofops:typecheck && npm run proofops:test",
+    "proofops:run": "node apps/proofops/src/cli.ts"
   },
   "dependencies": {
     "zod": "^4.6.5"
