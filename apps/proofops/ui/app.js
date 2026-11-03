@@ -233,6 +233,19 @@ function renderResult(snap) {
   stage("verify", r.verdict === "PASS" ? "done" : "bad");
   const ev = $("evidence");
   ev.replaceChildren();
+  if (r.manifestSha256) {
+    const seal = el("li", "mono small", `Manifest SHA-256 checksum (anchored outside the bundle): ${r.manifestSha256.slice(0, 32)}…`);
+    ev.append(seal);
+    const li = el("li");
+    const b = el("button", "ghost", "Re-check evidence integrity");
+    b.type = "button";
+    b.addEventListener("click", async () => {
+      const v = await fetch(`/api/runs/${snap.runId}/verify-evidence`).then((x) => x.json()).catch(() => null);
+      b.textContent = v?.ok ? `Intact: ${v.files} files match the anchored manifest` : `Integrity problem: ${(v?.problems ?? ["unreachable"]).join("; ")}`;
+    });
+    li.append(b);
+    ev.append(li);
+  }
   for (const [f, label] of [["report.md", "Run report"], ["manifest.json", "Manifest with file hashes"], ["assertions.json", "Verifier output"], ["policy-decisions.jsonl", "Policy decisions"],
     ["model-calls.jsonl", "Model calls (redacted)"], ["gateway.jsonl", "Gateway log"], ["server-state.json", "Store server state"], ["cleanup.json", "Teardown record"], ["spec.json", "Frozen spec"]]) {
     const li = el("li");

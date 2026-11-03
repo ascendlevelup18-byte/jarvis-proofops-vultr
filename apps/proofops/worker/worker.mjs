@@ -40,7 +40,9 @@ async function start({ startUrl }) {
   browser = await chromium.launch({
     headless: true,
     proxy: { server: PROXY, bypass: "" },
-    args: ["--disable-quic", "--disable-background-networking", "--disable-component-update", "--no-first-run",
+    // WebRTC must not open UDP outside the proxy (STUN/TURN would otherwise bypass it).
+    args: ["--force-webrtc-ip-handling-policy=disable_non_proxied_udp", "--webrtc-ip-handling-policy=disable_non_proxied_udp", "--dns-prefetch-disable",
+      "--disable-quic", "--disable-background-networking", "--disable-component-update", "--no-first-run",
       "--disable-sync", "--disable-features=MediaRouter,OptimizationHints,DialMediaRouteProvider", "--proxy-bypass-list=<-loopback>"],
     chromiumSandbox: !NO_SANDBOX,
   });
@@ -95,6 +97,33 @@ async function elementFor(ref, refEpoch) {
   return loc;
 }
 
+// Re-checks the element against what the policy approved and acts in the SAME page task, so no page script can
+// change the element between the check and the action (time-of-check/time-of-use). The click is a DOM click:
+// no hover or pointer events are dispatched that a page could use to swap the target at the last moment.
+async function actAtomically(loc, expect, action, value) {
+  const r = await loc.evaluate((n, args) => {
+    const tag = n.tagName.toLowerCase();
+    const now = {
+      tag,
+      href: tag === "a" ? n.href : undefined,
+      formAction: (tag === "button" || tag === "input") && n.form && (n.type === "submit" || tag === "button") ? n.form.action : undefined,
+      consequential: n.dataset.consequential === "true" || undefined,
+      name: n.name || undefined,
+    };
+    for (const k of ["tag", "href", "formAction", "consequential", "name"]) {
+      if ((now[k] ?? null) !== (args.expect[k] ?? null)) return { changed: k, was: args.expect[k] ?? null, now: now[k] ?? null };
+    }
+    if (args.action === "approve") {
+      const input = n.form && n.form.querySelector("input[name=approval]");
+      if (!input) return { changed: "approval_field", was: "present", now: null };
+      input.value = args.value;
+    }
+    if (args.action === "click" || args.action === "approve") n.click();
+    return { changed: null };
+  }, { expect, action, value });
+  if (r.changed) throw new Error(`element_changed: ${r.changed} was ${JSON.stringify(r.was)} now ${JSON.stringify(r.now)}`);
+}
+
 async function settle() {
   await page.waitForLoadState("load", { timeout: 8_000 }).catch(() => {});
 }
@@ -107,30 +136,30 @@ const handlers = {
     const res = await page.goto(url, { waitUntil: "load" });
     return { status: res?.status() ?? null, url: page.url() };
   },
-  async click({ ref, epoch: e }) {
+  async click({ ref, epoch: e, expect }) {
     const loc = await elementFor(ref, e);
     current = -1; // any action invalidates references, even if it then fails
-    await Promise.all([page.waitForLoadState("load").catch(() => {}), loc.click({ timeout: 5_000 })]);
+    const nav = page.waitForNavigation({ waitUntil: "load", timeout: 8_000 }).catch(() => {});
+    await actAtomically(loc, expect ?? {}, "click");
+    await nav;
     await settle();
     return { url: page.url() };
   },
-  async fill({ ref, epoch: e, value }) {
+  async fill({ ref, epoch: e, value, expect }) {
     const loc = await elementFor(ref, e);
     current = -1;
+    await actAtomically(loc, expect ?? {}, "check");
     await loc.fill(String(value).slice(0, 64), { timeout: 5_000 });
     return { url: page.url() };
   },
   // Called only by the control plane after an operator approved the exact cart (never reachable by the model).
   // The token is single-use and bound to this run and cart; the store verifies it independently.
-  async submitApproved({ ref, epoch: e, token }) {
+  async submitApproved({ ref, epoch: e, token, expect }) {
     const loc = await elementFor(ref, e);
     current = -1;
-    await loc.evaluate((el, t) => {
-      const input = el.form?.querySelector('input[name="approval"]');
-      if (!input) throw new Error("no approval field on this form");
-      input.value = t;
-    }, String(token));
-    await Promise.all([page.waitForLoadState("load").catch(() => {}), loc.click({ timeout: 5_000 })]);
+    const nav = page.waitForNavigation({ waitUntil: "load", timeout: 8_000 }).catch(() => {});
+    await actAtomically(loc, expect ?? {}, "approve", String(token));
+    await nav;
     await settle();
     return { url: page.url() };
   },
@@ -174,4 +203,5 @@ rl.on("line", async (line) => {
   }
 });
 rl.on("close", async () => { await browser?.close().catch(() => {}); process.exit(0); });
-log({ type: "worker.ready", node: process.version, bridge: Boolean(SOCKET) });
+// Variable NAMES only (never values), so tests can prove the environment is allow-listed.
+log({ type: "worker.ready", node: process.version, bridge: Boolean(SOCKET), envKeys: Object.keys(process.env).sort() });

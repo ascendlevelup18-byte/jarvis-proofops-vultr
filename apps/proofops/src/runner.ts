@@ -69,6 +69,14 @@ export interface RunResult {
   evidenceDir: string;
   steps: number;
   error: string | null;
+  /** SHA-256 of manifest.json: the anchor kept outside the bundle (registry, API). A checksum, not a signature. */
+  manifestSha256: string;
+}
+
+/** The element as the policy saw it; the worker refuses to act if it no longer matches. */
+function expectOf(obs: Observation, ref: string) {
+  const e = obs.elements.find((x) => x.ref === ref);
+  return e ? { tag: e.tag, href: e.href, formAction: e.formAction, consequential: e.consequential, name: e.name } : {};
 }
 
 const newRunId = () => `run_${new Date().toISOString().replace(/[-:.TZ]/g, "").slice(0, 14)}_${randomBytes(4).toString("hex")}`;
@@ -219,7 +227,7 @@ export async function runScenario(cfg: RunConfig): Promise<RunResult> {
             approvalsGranted += 1;
             ev("approval.granted", { step, payloadSha256 });
             try {
-              const r = await worker.call<{ url: string }>("submitApproved", { ref: a.ref, epoch: a.epoch, token });
+              const r = await worker.call<{ url: string }>("submitApproved", { ref: a.ref, epoch: a.epoch, token, expect: expectOf(obs, a.ref) });
               rec.dispatched = true;
               rec.approved = true;
               rec.result = `approved and submitted: ${r.url}`;
@@ -259,7 +267,7 @@ export async function runScenario(cfg: RunConfig): Promise<RunResult> {
         break;
       }
       try {
-        const r = await worker.call<{ url: string }>(d.op, d.op === "navigate" ? { url: d.url } : d.op === "click" ? { ref: d.ref, epoch: d.epoch } : { ref: d.ref, epoch: d.epoch, value: d.value });
+        const r = await worker.call<{ url: string }>(d.op, d.op === "navigate" ? { url: d.url } : d.op === "click" ? { ref: d.ref, epoch: d.epoch, expect: expectOf(obs, d.ref) } : { ref: d.ref, epoch: d.epoch, value: d.value, expect: expectOf(obs, d.ref) });
         rec.dispatched = true;
         rec.result = `ok ${r.url}`;
       } catch (e) {
@@ -358,15 +366,17 @@ export async function runScenario(cfg: RunConfig): Promise<RunResult> {
     ? { runtime: cfg.worker.limits.runtime, network: "none + per-run gateway socket", chromiumSandbox: !cfg.worker.limits.chromiumNoSandbox, image: cfg.worker.limits.image }
     : { runtime: "none (LOCAL: plain child process, NOT isolated)", network: "proxy to per-run gateway on loopback", chromiumSandbox: true, image: null };
   const manifest = {
-    runId, tier: cfg.tier, codeSha: cfg.codeSha, deployment: cfg.deployment, mode: cfg.mode,
+    runId, tier: cfg.tier, codeSha: cfg.codeSha, specSha256: spec.specSha256, deployment: cfg.deployment, mode: cfg.mode,
     model: { kind: cfg.planner.kind, requested: cfg.planner.model, responseModels: [...new Set(modelCalls.map((m) => m.responseModel).filter(Boolean))] },
     startedAt: events[0]?.at, finishedAt: new Date().toISOString(), status, error, verdict: report.verdict, outcomes: report.outcomes,
     limits: { maxSteps, wallClockMs: cfg.wallClockMs ?? 120_000, maxModelCalls }, isolation,
     files,
   };
-  await writeFile(join(dir, "manifest.json"), JSON.stringify(manifest, null, 2));
+  const manifestText = JSON.stringify(manifest, null, 2);
+  await writeFile(join(dir, "manifest.json"), manifestText);
+  const manifestSha256 = sha256(manifestText);
   await writeFile(join(dir, "report.md"), renderReport(manifest, report, steps, spec));
-  return { runId, status, verdict: report.verdict, report, evidenceDir: dir, steps: steps.length, error };
+  return { runId, status, verdict: report.verdict, report, evidenceDir: dir, steps: steps.length, error, manifestSha256 };
 }
 
 function renderReport(m: Record<string, unknown> & { runId: string; tier: string }, r: VerifierReport, steps: StepRecord[], spec: FrozenSpec): string {

@@ -15,6 +15,7 @@ import { stubPlanner, vultrPlanner, type Planner } from "./model.ts";
 import { runScenario, type ApprovalRequest, type RunConfig, type Tier } from "./runner.ts";
 import { SCENARIOS, findScenario, type Scenario } from "./scenarios.ts";
 import { RunStore } from "./store.ts";
+import { verifyEvidence } from "./evidence.ts";
 
 const arg = (name: string, fallback?: string) => {
   const i = process.argv.indexOf(`--${name}`);
@@ -120,8 +121,8 @@ async function startRun(scenario: Scenario, idempotencyKey: string | null): Prom
   void runScenario(cfg)
     .then((r) => {
       live.status = r.status;
-      live.result = { verdict: r.verdict, outcomes: r.report.outcomes, checks: r.report.checks, error: r.error, evidenceDir: r.evidenceDir, steps: r.steps };
-      registry.update(runId, { status: r.status, verdict: r.verdict, error: r.error, evidenceDir: r.evidenceDir });
+      live.result = { verdict: r.verdict, outcomes: r.report.outcomes, checks: r.report.checks, error: r.error, steps: r.steps, manifestSha256: r.manifestSha256 };
+      registry.update(runId, { status: r.status, verdict: r.verdict, error: r.error, evidenceDir: r.evidenceDir, manifestSha256: r.manifestSha256 });
     })
     .catch((e: Error) => {
       live.status = "failed";
@@ -228,6 +229,12 @@ const server = createServer(async (req, res) => {
         if (live !== active || !live) return json(res, 409, { error: "not_running" });
         live.abort.abort();
         return json(res, 202, { ok: true });
+      }
+      if (req.method === "GET" && sub === "/verify-evidence") {
+        // Re-hashes the bundle on disk and compares it with the manifest hash anchored in the registry.
+        const row = registry.get(id);
+        if (!row?.evidence_dir) return json(res, 404, { error: "not_found" });
+        return json(res, 200, { runId: id, anchoredManifestSha256: row.manifest_sha256, kind: "sha256-checksum (not a signature)", ...verifyEvidence(row.evidence_dir, row.manifest_sha256) });
       }
       const f = /^\/evidence\/([A-Za-z0-9._/-]{1,120})$/.exec(sub);
       if (req.method === "GET" && f && !f[1]!.includes("..")) return serveFile(res, join(EVIDENCE_ROOT, id), f[1]!);

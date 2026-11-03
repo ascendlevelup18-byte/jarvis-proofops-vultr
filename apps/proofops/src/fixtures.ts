@@ -2,8 +2,8 @@
 // The coupon rule lives here, outside page content and model output. All money is integer cents.
 import { createHash } from "node:crypto";
 
-export type FixtureMode = "normal" | "wrong-total" | "hostile" | "broken" | "hang";
-export const FIXTURE_MODES: readonly FixtureMode[] = ["normal", "wrong-total", "hostile", "broken", "hang"];
+export type FixtureMode = "normal" | "wrong-total" | "hostile" | "broken" | "hang" | "probe" | "mutating";
+export const FIXTURE_MODES: readonly FixtureMode[] = ["normal", "wrong-total", "hostile", "broken", "hang", "probe", "mutating"];
 
 export const RULES_VERSION = "proofops-coupon-rules@1";
 export const FIXTURE_VERSION = "proofops-store@1";

@@ -14,6 +14,7 @@ export interface RunRow {
   verdict: string | null;
   error: string | null;
   evidence_dir: string | null;
+  manifest_sha256: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -41,6 +42,11 @@ export class RunStore {
       );
       CREATE INDEX IF NOT EXISTS runs_created ON runs (created_at DESC);
     `);
+    // Additive migration: the evidence manifest anchor (SHA-256 checksum of manifest.json).
+    const cols = (this.#db.prepare("PRAGMA table_info(runs)").all() as { name: string }[]).map((c) => c.name);
+    if (!cols.includes("manifest_sha256")) {
+      this.#db.exec("ALTER TABLE runs ADD COLUMN manifest_sha256 TEXT CHECK (manifest_sha256 IS NULL OR length(manifest_sha256) = 64)");
+    }
   }
 
   /** Marks runs interrupted by a crash or restart as failed. Returns how many were recovered. */
@@ -74,14 +80,14 @@ export class RunStore {
   }
 
   /** Only legal forward transitions; a finished run is never reopened. */
-  update(id: string, patch: { status: RunStatus; verdict?: string | null; error?: string | null; evidenceDir?: string | null }): void {
+  update(id: string, patch: { status: RunStatus; verdict?: string | null; error?: string | null; evidenceDir?: string | null; manifestSha256?: string | null }): void {
     const terminal = ["completed", "failed", "timed_out", "cancelled"];
     const cur = this.get(id);
     if (!cur) throw new Error(`unknown run ${id}`);
     if (terminal.includes(cur.status)) throw new Error(`run ${id} is already ${cur.status}`);
     this.#db
-      .prepare(`UPDATE runs SET status = ?, verdict = COALESCE(?, verdict), error = ?, evidence_dir = COALESCE(?, evidence_dir), updated_at = ? WHERE id = ?`)
-      .run(patch.status, patch.verdict ?? null, patch.error?.slice(0, 300) ?? null, patch.evidenceDir ?? null, new Date().toISOString(), id);
+      .prepare(`UPDATE runs SET status = ?, verdict = COALESCE(?, verdict), error = ?, evidence_dir = COALESCE(?, evidence_dir), manifest_sha256 = COALESCE(?, manifest_sha256), updated_at = ? WHERE id = ?`)
+      .run(patch.status, patch.verdict ?? null, patch.error?.slice(0, 300) ?? null, patch.evidenceDir ?? null, patch.manifestSha256 ?? null, new Date().toISOString(), id);
   }
 
   close(): void {
