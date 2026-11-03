@@ -20,15 +20,28 @@ async function post(path: string, body: unknown, extra: Record<string, string> =
   return { status: r.status, body: await r.json() };
 }
 
+const extra: { busy?: number; approvals?: number[]; evidence?: string } = {};
 async function runMission(id: string, approve: boolean): Promise<Snap> {
+  delete extra.busy; delete extra.approvals; delete extra.evidence;
   const start = await post("/api/runs", { scenario: id }, { "idempotency-key": crypto.randomUUID() });
   if (start.status !== 202) throw new Error(`${id}: start failed ${start.status} ${JSON.stringify(start.body)}`);
   const runId = start.body.runId as string;
+  // Only one mission at a time: a second start while this one runs must be refused, not queued silently.
+  const second = await post("/api/runs", { scenario: id }, { "idempotency-key": crypto.randomUUID() });
+  extra.busy = second.status;
   const deadline = Date.now() + 240_000;
   for (;;) {
     const s = (await get(`/api/runs/${runId}`)) as Snap;
-    if (s.pendingApproval && approve) await post(`/api/runs/${runId}/approve`, { payloadSha256: s.pendingApproval.payloadSha256 });
-    if (s.result) return s;
+    if (s.pendingApproval && approve) {
+      // Two operators approve at the same moment: exactly one signature may be issued.
+      const both = await Promise.all([0, 1].map(() => post(`/api/runs/${runId}/approve`, { payloadSha256: s.pendingApproval!.payloadSha256 })));
+      extra.approvals = both.map((b) => b.status).sort();
+    }
+    if (s.result) {
+      const v = (await get(`/api/runs/${runId}/verify-evidence`)) as { status: string; reasons: string[] };
+      extra.evidence = v.status;
+      return s;
+    }
     if (Date.now() > deadline) throw new Error(`${id}: no result in time`);
     await sleep(500);
   }
@@ -63,9 +76,12 @@ for (const e of expectations) {
   const t0 = Date.now();
   try {
     const s = await runMission(e.id, Boolean(e.approve));
-    const problem = e.ok(s);
+    let problem = e.ok(s);
+    if (!problem && extra.busy !== 409) problem = `a second concurrent start returned ${extra.busy}, expected 409`;
+    if (!problem && e.approve && JSON.stringify(extra.approvals) !== JSON.stringify([200, 409])) problem = `concurrent approvals returned ${JSON.stringify(extra.approvals)}, expected [200,409]`;
+    if (!problem && extra.evidence !== s.result!.verdict) problem = `evidence classified ${extra.evidence}, sealed verdict ${s.result!.verdict}`;
     if (problem) failures++;
-    console.log(`${problem ? "FAIL" : "ok  "}  ${e.id.padEnd(22)} ${s.status.padEnd(10)} verdict=${s.result!.verdict.padEnd(12)} blocked=${String(blocked(s)).padEnd(3)} ${((Date.now() - t0) / 1000).toFixed(1)}s  ${s.runId}${problem ? `  <- ${problem}` : ""}`);
+    console.log(`${problem ? "FAIL" : "ok  "}  ${e.id.padEnd(22)} ${s.status.padEnd(10)} verdict=${s.result!.verdict.padEnd(12)} blocked=${String(blocked(s)).padEnd(3)} evidence=${String(extra.evidence).padEnd(5)} ${((Date.now() - t0) / 1000).toFixed(1)}s  ${s.runId}${problem ? `  <- ${problem}` : ""}`);
   } catch (err) {
     failures++;
     console.log(`FAIL  ${e.id}: ${(err as Error).message}`);

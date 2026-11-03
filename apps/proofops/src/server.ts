@@ -157,6 +157,7 @@ async function readJson(req: IncomingMessage): Promise<Record<string, unknown>> 
 }
 // Mutating calls must come from this UI (same-origin fetch with a custom header), which blocks cross-site forms.
 const sameOrigin = (req: IncomingMessage) => req.headers["x-proofops"] === "1";
+const RUNS_PER_MINUTE = Math.min(Math.max(Number(process.env.PROOFOPS_RUNS_PER_MIN ?? "10") || 10, 1), 120);
 const perIp = new Map<string, number[]>();
 function rateLimited(req: IncomingMessage): boolean {
   const ip = req.socket.remoteAddress ?? "?";
@@ -164,7 +165,7 @@ function rateLimited(req: IncomingMessage): boolean {
   const hits = (perIp.get(ip) ?? []).filter((t) => now - t < 60_000);
   hits.push(now);
   perIp.set(ip, hits);
-  return hits.length > 10;
+  return hits.length > RUNS_PER_MINUTE;
 }
 
 async function serveFile(res: ServerResponse, base: string, rel: string) {
@@ -216,13 +217,22 @@ const server = createServer(async (req, res) => {
       }
       if (req.method === "POST" && (sub === "/approve" || sub === "/reject")) {
         if (!sameOrigin(req)) return json(res, 403, { error: "missing_ui_header" });
-        if (!live?.pendingApproval) return json(res, 409, { error: "no_pending_approval" });
         const body = await readJson(req);
-        if (body.payloadSha256 !== live.pendingApproval.payloadSha256) return json(res, 409, { error: "approval_payload_changed" });
-        if (sub === "/reject") { live.pendingApproval.resolve(null); return json(res, 200, { ok: true }); }
-        const token = await signer.sign({ operator: "demo-operator", workspace: "demo-workspace", runId: id, payloadSha256: live.pendingApproval.payloadSha256 });
-        live.pendingApproval.resolve(token);
-        return json(res, 200, { ok: true });
+        // Claim the pending request synchronously (no await in between), so two simultaneous decisions can never
+        // both reach the signer: the first claims it, every other caller sees nothing pending.
+        const pending = live?.pendingApproval;
+        if (!live || !pending) return json(res, 409, { error: "no_pending_approval" });
+        if (body.payloadSha256 !== pending.payloadSha256) return json(res, 409, { error: "approval_payload_changed" });
+        live.pendingApproval = null;
+        if (sub === "/reject") { pending.resolve(null); return json(res, 200, { ok: true }); }
+        try {
+          const token = await signer.sign({ operator: "demo-operator", workspace: "demo-workspace", runId: id, payloadSha256: pending.payloadSha256 });
+          pending.resolve(token);
+          return json(res, 200, { ok: true });
+        } catch {
+          pending.resolve(null); // signer failure is a refusal, never a silent approval
+          return json(res, 503, { error: "signer_unavailable" });
+        }
       }
       if (req.method === "POST" && sub === "/cancel") {
         if (!sameOrigin(req)) return json(res, 403, { error: "missing_ui_header" });
