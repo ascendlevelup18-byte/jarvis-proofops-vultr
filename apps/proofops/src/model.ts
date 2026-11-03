@@ -28,7 +28,8 @@ export interface ModelCallRecord {
 export interface Planner {
   readonly kind: "vultr" | "stub";
   readonly model: string;
-  next(turn: PlannerTurn): Promise<ModelCallRecord>;
+  /** The signal is aborted when the run stops; a reply arriving after that is discarded by the runner. */
+  next(turn: PlannerTurn, signal?: AbortSignal): Promise<ModelCallRecord>;
 }
 
 export const SYSTEM_PROMPT = `You are the browser planner for JARVIS ProofOps, a commerce QA agent.
@@ -78,30 +79,35 @@ export function parseActionJson(content: string): unknown {
   }
 }
 
-export function vultrPlanner(opts: { apiKey: string; model: string; timeoutMs?: number }): Planner {
+export function vultrPlanner(opts: { apiKey: string; model: string; timeoutMs?: number; baseUrl?: string; retryBaseDelayMs?: number }): Planner {
+  // baseUrl is overridable only so tests can point at a local mock; production always uses Vultr.
   const client = new OpenAICompatibleClient({
-    baseUrl: VULTR_INFERENCE_BASE_URL, model: opts.model, apiKey: opts.apiKey, timeoutMs: opts.timeoutMs ?? 30_000, maxRetries: 2,
+    baseUrl: opts.baseUrl ?? VULTR_INFERENCE_BASE_URL, model: opts.model, apiKey: opts.apiKey, timeoutMs: opts.timeoutMs ?? 30_000, maxRetries: 2,
+    retryBaseDelayMs: opts.retryBaseDelayMs ?? 400,
   });
+  // Generic redaction catches key-shaped strings; this also removes the exact key if a provider echoes it back.
+  const scrub = (t: string) => redactSecrets(opts.apiKey ? t.replaceAll(opts.apiKey, "[REDACTED]") : t);
   return {
     kind: "vultr",
     model: opts.model,
-    async next(turn) {
+    async next(turn, signal) {
       const started = performance.now();
       try {
         const r = await client.chatCompletions({
           messages: [{ role: "system", content: SYSTEM_PROMPT }, { role: "user", content: userMessage(turn) }],
           temperature: 0,
           maxTokens: 300,
+          signal,
         });
         return {
           provider: "vultr-serverless-inference", requestedModel: opts.model, responseModel: r.model ?? null, responseId: r.id ?? null,
-          usage: r.usage ?? null, latencyMs: Math.round(performance.now() - started), rawContent: redactSecrets(r.content).slice(0, 4_000),
+          usage: r.usage ?? null, latencyMs: Math.round(performance.now() - started), rawContent: scrub(r.content).slice(0, 4_000),
           parsed: parseActionJson(r.content), error: null,
         };
       } catch (e) {
         return {
           provider: "vultr-serverless-inference", requestedModel: opts.model, responseModel: null, responseId: null, usage: null,
-          latencyMs: Math.round(performance.now() - started), rawContent: "", parsed: null, error: redactSecrets(String((e as Error).message)).slice(0, 300),
+          latencyMs: Math.round(performance.now() - started), rawContent: "", parsed: null, error: scrub(String((e as Error).message)).slice(0, 300),
         };
       }
     },

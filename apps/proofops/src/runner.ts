@@ -170,6 +170,7 @@ export async function runScenario(cfg: RunConfig): Promise<RunResult> {
   let status: RunResult["status"] = "completed";
   let stopReason: "timed_out" | "cancelled" | null = null;
   let stopTimer: NodeJS.Timeout | undefined;
+  const plannerAbort = new AbortController(); // cancels an in-flight model call when the run stops
   let error: string | null = null;
   let dom: { subtotal: string | null; discount: string | null; total: string | null; checkoutMarker: boolean } | null = null;
   let cleanup = { workerGone: null as boolean | null, detail: "not started" };
@@ -197,6 +198,7 @@ export async function runScenario(cfg: RunConfig): Promise<RunResult> {
     const hardStop = (reason: "timed_out" | "cancelled") => {
       if (stopReason) return;
       stopReason = reason;
+      plannerAbort.abort();
       ev(reason === "timed_out" ? "run.wall_clock_expired" : "run.cancel_requested", {});
       void w.destroy();
     };
@@ -215,8 +217,9 @@ export async function runScenario(cfg: RunConfig): Promise<RunResult> {
       const call = await cfg.planner.next({
         task: spec.task, allowedPaths: scope.navigablePaths, observation: obs,
         history: steps.map((s) => ({ action: s.proposal, decision: s.policy.decision, rule: s.policy.rule, result: s.result })),
-      });
+      }, plannerAbort.signal);
       modelCalls.push(call);
+      if (stopReason) { ev("model.reply_after_stop_discarded", { step }); break; } // never act on a late reply
       const decision = call.error
         ? ({ decision: "deny", rule: "model_error", detail: call.error } as PolicyDecision)
         : call.parsed === null
