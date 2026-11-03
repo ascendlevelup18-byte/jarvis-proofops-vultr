@@ -2,7 +2,7 @@
 //   freeze spec -> storefront session -> per-run gateway -> disposable worker -> plan/policy/dispatch loop
 //   -> control-plane verification reads -> server-side state -> teardown -> verifier -> evidence bundle.
 // The model proposes; the policy decides; the worker executes; the verifier judges; the evidence records it all.
-import { mkdir, writeFile, readFile, rm } from "node:fs/promises";
+import { mkdir, writeFile, readFile, rm, chmod } from "node:fs/promises";
 import { createHash, randomBytes } from "node:crypto";
 import { join } from "node:path";
 import type { AddressInfo } from "node:net";
@@ -135,8 +135,10 @@ export async function runScenario(cfg: RunConfig): Promise<RunResult> {
   let proxyUrl = "";
   if (cfg.worker.kind === "sandbox") {
     socketDir = join(cfg.worker.socketRoot, runId);
-    await mkdir(socketDir, { recursive: true, mode: 0o700 });
+    // Per-run directory: traversable but not listable; the socket is connectable by the worker's uid (10001).
+    await mkdir(socketDir, { recursive: true, mode: 0o711 });
     await listen(gateway, { path: join(socketDir, "gw.sock") });
+    await chmod(join(socketDir, "gw.sock"), 0o666);
   } else {
     await listen(gateway, { port: 0, host: "127.0.0.1" });
     proxyUrl = `http://127.0.0.1:${(gateway.address() as AddressInfo).port}`;
