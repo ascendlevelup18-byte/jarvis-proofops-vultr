@@ -3,7 +3,7 @@
 // non-zero if any probe that must fail succeeds, or any probe that must succeed fails. Fails closed: if the
 // container cannot start under runsc, that is a failure, never a fallback.
 //   sudo -u proofops node apps/proofops/src/vm-boundary.ts [--image proofops-worker:1.64.1]
-import { spawnSync, execFileSync } from "node:child_process";
+import { spawn, execFileSync } from "node:child_process";
 import { mkdirSync, rmSync, chmodSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import type { AddressInfo } from "node:net";
@@ -45,6 +45,10 @@ const viaGateway = (target, method = "GET") => new Promise((r) => {
   out.gw_loopback = await viaGateway("http://127.0.0.1:22/");
   out.gw_other_run = await viaGateway("http://store.proofops.test/s/000000000000000000000000/");
   out.gw_connect = await viaGateway("store.proofops.test:443", "CONNECT");
+  // Guest kernel log: under gVisor the Sentry prints its own boot lines here.
+  out.dmesg = (() => { try { return require("node:child_process").execSync("dmesg 2>&1", { encoding: "utf8" }).slice(0, 2000); } catch (e) { return "dmesg unavailable: " + (e.code || e.message); } })();
+  // Stay alive briefly so the host can inspect the running container from outside.
+  await new Promise((r) => setTimeout(r, 3000));
   process.stdout.write(JSON.stringify(out));
 })();`;
 
@@ -65,7 +69,28 @@ const args = sandboxArgs({ kind: "sandbox", runId, socketDir, limits: { image, r
 const at = args.indexOf(image);
 const probeArgs = [...args.slice(0, at), "-e", `PROBE_PATH=${basePath}`, "--entrypoint", "node", image, "-e", PROBE];
 const started = Date.now();
-const res = spawnSync("docker", probeArgs, { encoding: "utf8", timeout: 90_000 });
+// Run the probe and, while it is alive, ask Docker (outside the sandbox) what it actually started.
+const child = spawn("docker", probeArgs, { stdio: ["ignore", "pipe", "pipe"] });
+let stdout = "";
+let stderr = "";
+child.stdout.on("data", (d) => (stdout += d));
+child.stderr.on("data", (d) => (stderr += d));
+const killTimer = setTimeout(() => child.kill("SIGKILL"), 90_000);
+let inspected: Record<string, unknown> | null = null;
+for (let i = 0; i < 40 && inspected === null; i++) {
+  await new Promise((r) => setTimeout(r, 250));
+  try {
+    const raw = execFileSync("docker", ["inspect", "--format", "{{json .HostConfig}}|{{json .Config.User}}|{{json .Config.Env}}", `proofops-${runId}`], { encoding: "utf8" }).trim();
+    const [host, user, env] = raw.split("|");
+    const h = JSON.parse(host!);
+    inspected = { runtime: h.Runtime, networkMode: h.NetworkMode, readonlyRootfs: h.ReadonlyRootfs, capDrop: h.CapDrop, securityOpt: h.SecurityOpt,
+      memory: h.Memory, memorySwap: h.MemorySwap, nanoCpus: h.NanoCpus, pidsLimit: h.PidsLimit, binds: h.Binds, privileged: h.Privileged,
+      user: JSON.parse(user!), envNames: (JSON.parse(env!) as string[]).map((e) => e.split("=")[0]) };
+  } catch { /* not started yet */ }
+}
+const status = await new Promise<number | null>((r) => child.on("exit", (code) => r(code)));
+clearTimeout(killTimer);
+const res = { stdout, stderr, status };
 const inspectRuntime = (() => { try { return execFileSync("docker", ["info", "--format", "{{json .Runtimes}}"], { encoding: "utf8" }).trim(); } catch { return "unavailable"; } })();
 const leftover = execFileSync("docker", ["ps", "-a", "-q", "--filter", `label=proofops.run=${runId}`], { encoding: "utf8" }).trim();
 gw.close();
@@ -77,7 +102,13 @@ try { probe = JSON.parse(res.stdout); } catch { /* reported below */ }
 const must = (name: string, ok: boolean, detail: unknown) => ({ name, ok, detail });
 const NET_FAIL = (v: unknown) => typeof v === "string" && v !== "CONNECTED" && !String(v).startsWith("RESOLVED") && v !== "SENT";
 const checks = probe ? [
-  must("runs under gVisor (kernel string)", /gVisor|runsc/i.test(String(probe.kernel)) || String(probe.kernel).includes("4.4.0"), probe.kernel),
+  must("Docker reports the running container's runtime as runsc (observed from the host)", inspected?.runtime === "runsc", inspected?.runtime ?? "not inspected"),
+  must("guest kernel log shows gVisor (observed inside)", /gvisor/i.test(String(probe.dmesg)), String(probe.dmesg).slice(0, 300)),
+  must("host-observed isolation: network none, read-only root, all caps dropped, not privileged",
+    inspected?.networkMode === "none" && inspected?.readonlyRootfs === true && JSON.stringify(inspected?.capDrop) === JSON.stringify(["ALL"]) && inspected?.privileged === false, inspected),
+  must("host-observed limits: 1 GiB memory, no extra swap, 1 CPU, 256 pids",
+    inspected?.memory === 1073741824 && inspected?.memorySwap === 1073741824 && inspected?.nanoCpus === 1e9 && inspected?.pidsLimit === 256, inspected),
+  must("only the per-run socket directory is mounted", JSON.stringify(inspected?.binds) === JSON.stringify([`${socketDir}:/run/proofops`]), inspected?.binds),
   must("non-root uid 10001", probe.uid === 10001, probe.uid),
   must("only loopback interface", JSON.stringify(probe.interfaces) === JSON.stringify(["lo"]), probe.interfaces),
   must("no secret-named env vars", !(probe.envKeys as string[]).some((k) => /KEY|SECRET|TOKEN|PASSWORD/i.test(k)), probe.envKeys),
@@ -100,7 +131,7 @@ const checks = probe ? [
 ] : [must("probe container ran under runsc", false, { status: res.status, stderr: (res.stderr ?? "").slice(-800) })];
 
 const report = { tier: "VULTR_GVISOR", runId, image, at: new Date().toISOString(), durationMs: Date.now() - started, dockerRuntimes: inspectRuntime,
-  launchFlags: probeArgs.filter((a) => a.startsWith("--") || a === "-v"), probe, gatewayDecisions: gwEvents, checks,
+  launchFlags: probeArgs.filter((a) => a.startsWith("--") || a === "-v"), hostObserved: inspected, probe, gatewayDecisions: gwEvents, checks,
   passed: checks.filter((c) => c.ok).length, failed: checks.filter((c) => !c.ok).length };
 const outPath = process.argv.includes("--out") ? process.argv[process.argv.indexOf("--out") + 1]! : null;
 if (outPath) writeFileSync(outPath, JSON.stringify(report, null, 2));

@@ -26,7 +26,8 @@
     "proofops:run": "node apps/proofops/src/cli.ts",
     "proofops:e2e": "node --test --test-concurrency=1 apps/proofops/e2e/*.test.ts",
     "proofops:demo": "node apps/proofops/src/server.ts",
-    "proofops:smoke": "node apps/proofops/src/smoke.ts"
+    "proofops:smoke": "node apps/proofops/src/smoke.ts",
+    "proofops:release": "node apps/proofops/src/release-gate.ts"
   },
   "dependencies": {
     "zod": "^4.6.5"
