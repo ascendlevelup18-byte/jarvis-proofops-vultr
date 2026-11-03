@@ -15,7 +15,7 @@ import { stubPlanner, vultrPlanner, type Planner } from "./model.ts";
 import { runScenario, type ApprovalRequest, type RunConfig, type Tier } from "./runner.ts";
 import { SCENARIOS, findScenario, type Scenario } from "./scenarios.ts";
 import { RunStore } from "./store.ts";
-import { verifyEvidence } from "./evidence.ts";
+import { classifyEvidence } from "./evidence.ts";
 
 const arg = (name: string, fallback?: string) => {
   const i = process.argv.indexOf(`--${name}`);
@@ -234,7 +234,8 @@ const server = createServer(async (req, res) => {
         // Re-hashes the bundle on disk and compares it with the manifest hash anchored in the registry.
         const row = registry.get(id);
         if (!row?.evidence_dir) return json(res, 404, { error: "not_found" });
-        return json(res, 200, { runId: id, anchoredManifestSha256: row.manifest_sha256, kind: "sha256-checksum (not a signature)", ...verifyEvidence(row.evidence_dir, row.manifest_sha256) });
+        const c = classifyEvidence(row.evidence_dir, row.manifest_sha256);
+        return json(res, 200, { ...c, runId: id, anchoredManifestSha256: row.manifest_sha256, kind: "sha256-checksum (not a signature)", ok: c.status === "PASS" || c.status === "FAIL" });
       }
       const f = /^\/evidence\/([A-Za-z0-9._/-]{1,120})$/.exec(sub);
       if (req.method === "GET" && f && !f[1]!.includes("..")) return serveFile(res, join(EVIDENCE_ROOT, id), f[1]!);

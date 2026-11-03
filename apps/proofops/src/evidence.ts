@@ -6,7 +6,8 @@
 //   node apps/proofops/src/evidence.ts <evidence-dir> [expected-manifest-sha256]
 import { createHash } from "node:crypto";
 import { readFileSync, readdirSync, statSync } from "node:fs";
-import { join, relative } from "node:path";
+import { join, relative, basename } from "node:path";
+import { specIntact, type FrozenSpec } from "./fixtures.ts";
 import { fileURLToPath } from "node:url";
 
 export const sha256 = (b: Buffer | string) => createHash("sha256").update(b).digest("hex");
@@ -56,13 +57,54 @@ export function verifyEvidence(dir: string, anchoredManifestSha256?: string | nu
   return { ok: problems.length === 0, problems, files: Object.keys(files).length };
 }
 
+export type EvidenceStatus = "PASS" | "FAIL" | "INCOMPLETE" | "TAMPERED";
+
+const REQUIRED = ["spec.json", "scope.json", "assertions.json", "cleanup.json", "server-state.json", "policy-decisions.jsonl", "gateway.jsonl", "model-calls.jsonl"];
+
+/**
+ * Independent verdict on a bundle, from the files alone:
+ *   TAMPERED   - any file differs from the manifest, the manifest differs from its anchor, the run id or verdict
+ *                disagree between files, or the frozen spec's seal is broken
+ *   INCOMPLETE - a required record is absent, the verifier was inconclusive, or teardown is not proven
+ *   PASS/FAIL  - the sealed verifier verdict
+ * Without an anchor, a rewrite of both a file and the manifest cannot be detected; the result says so.
+ */
+export function classifyEvidence(dir: string, anchoredManifestSha256?: string | null) {
+  const reasons: string[] = [];
+  const integrity = verifyEvidence(dir, anchoredManifestSha256);
+  let status: EvidenceStatus | null = integrity.ok ? null : "TAMPERED";
+  reasons.push(...integrity.problems);
+  const read = (f: string) => { try { return JSON.parse(readFileSync(join(dir, f), "utf8")); } catch { return null; } };
+  const manifest = read("manifest.json") as { runId?: string; verdict?: string; status?: string; files?: Record<string, string> } | null;
+  const assertions = read("assertions.json") as { verdict?: string; outcomes?: Record<string, string> } | null;
+  const spec = read("spec.json") as FrozenSpec | null;
+  const cleanup = read("cleanup.json") as { workerGone?: boolean | null } | null;
+  if (manifest) {
+    if (manifest.runId !== basename(dir)) { status = "TAMPERED"; reasons.push(`manifest runId ${manifest.runId} does not match the bundle ${basename(dir)}`); }
+    if (assertions && manifest.verdict !== assertions.verdict) { status = "TAMPERED"; reasons.push("manifest verdict differs from the sealed verifier output"); }
+    if (spec && !specIntact(spec)) { status = "TAMPERED"; reasons.push("frozen spec content no longer matches its seal"); }
+    for (const f of REQUIRED) if (!(f in (manifest.files ?? {}))) { reasons.push(`${f} was never recorded`); status ??= "INCOMPLETE"; }
+  }
+  if (!status) {
+    if (!assertions?.verdict || assertions.verdict === "INCONCLUSIVE") { status = "INCOMPLETE"; reasons.push("verifier result inconclusive"); }
+    else if (cleanup?.workerGone !== true) { status = "INCOMPLETE"; reasons.push("worker teardown not proven"); }
+    else status = assertions.verdict === "PASS" ? "PASS" : "FAIL";
+  }
+  return {
+    status, reasons, runId: manifest?.runId ?? null, runStatus: manifest?.status ?? null,
+    integrity: anchoredManifestSha256 ? "checked against anchored manifest hash (sha256 checksum, not a signature)"
+      : "file hashes checked against the manifest only; without the anchor a rewritten manifest cannot be detected",
+    files: integrity.files,
+  };
+}
+
 if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
   const dir = process.argv[2];
   if (!dir) {
     console.error("usage: node apps/proofops/src/evidence.ts <evidence-dir> [expected-manifest-sha256]");
     process.exit(2);
   }
-  const r = verifyEvidence(dir, process.argv[3]);
+  const r = classifyEvidence(dir, process.argv[3]);
   console.log(JSON.stringify({ dir, manifestSha256: manifestHash(dir), ...r }, null, 2));
-  process.exit(r.ok ? 0 : 1);
+  process.exit(r.status === "PASS" || r.status === "FAIL" ? 0 : 1);
 }

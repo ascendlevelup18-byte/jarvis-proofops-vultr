@@ -260,7 +260,10 @@ function renderResult(snap) {
     b.type = "button";
     b.addEventListener("click", async () => {
       const v = await fetch(`/api/runs/${snap.runId}/verify-evidence`).then((x) => x.json()).catch(() => null);
-      b.textContent = v?.ok ? `Intact: ${v.files} files match the anchored manifest` : `Integrity problem: ${(v?.problems ?? ["unreachable"]).join("; ")}`;
+      b.textContent = !v ? "Evidence check unreachable"
+        : v.status === "TAMPERED" ? `TAMPERED: ${v.reasons.join("; ")}`
+        : v.status === "INCOMPLETE" ? `INCOMPLETE: ${v.reasons.join("; ")}`
+        : `Intact: ${v.files} files match the anchored manifest. Sealed verdict ${v.status}.`;
     });
     li.append(b);
     ev.append(li);
