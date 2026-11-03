@@ -37,18 +37,37 @@ async function loadHealth() {
 }
 
 // ---------- missions ----------
+// Radio-group pattern: one tab stop, arrow keys move the selection, focus is never lost on select.
+function selectScenario(s, focus = false) {
+  selected = s;
+  for (const b of $("scenario-list").children) {
+    const on = b.dataset.id === s.id;
+    b.setAttribute("aria-checked", String(on));
+    b.tabIndex = on ? 0 : -1;
+    if (on && focus) b.focus();
+  }
+  $("run-btn").disabled = Boolean(current?.running);
+}
+
 function renderScenarios() {
   const list = $("scenario-list");
   list.replaceChildren();
-  for (const s of scenarios) {
+  scenarios.forEach((s, i) => {
     const b = el("button", "scenario");
     b.type = "button";
+    b.dataset.id = s.id;
     b.setAttribute("role", "radio");
-    b.setAttribute("aria-checked", String(selected?.id === s.id));
     b.append(el("strong", "", s.title), el("span", "", s.purpose));
-    b.addEventListener("click", () => { selected = s; renderScenarios(); $("run-btn").disabled = Boolean(current?.running); });
+    b.addEventListener("click", () => selectScenario(s));
+    b.addEventListener("keydown", (e) => {
+      const step = { ArrowDown: 1, ArrowRight: 1, ArrowUp: -1, ArrowLeft: -1 }[e.key];
+      if (!step) return;
+      e.preventDefault();
+      selectScenario(scenarios[(i + step + scenarios.length) % scenarios.length], true);
+    });
     list.append(b);
-  }
+  });
+  if (selected) selectScenario(selected);
 }
 
 async function loadHistory() {
@@ -270,7 +289,10 @@ async function startRun() {
     $("main").focus();
     follow(runId);
   } catch (e) {
-    $("run-error").textContent = e.status === 409 ? "Another mission is still running. Wait for it to finish." : `Could not start: ${e.message}`;
+    $("run-error").textContent = e.status === 409 ? "Another mission is still running. Wait for it to finish."
+      : e.status === 429 ? "Too many runs from this address in the last minute. Try again shortly."
+      : e instanceof TypeError ? "The control plane is not reachable. Check that it is running."
+      : `Could not start the mission (${e.message}).`;
     $("run-error").hidden = false;
     $("run-btn").disabled = false;
   }
@@ -315,7 +337,12 @@ async function decide(kind) {
     showApproval(null);
     setStatus("running");
   } catch (e) {
-    $("run-error").textContent = `Approval failed: ${e.message}`;
+    const why = {
+      no_pending_approval: "This approval request has already been answered or has expired. Nothing was signed.",
+      approval_payload_changed: "The cart changed after this request was shown. Nothing was signed; the agent must ask again.",
+      missing_ui_header: "The request did not come from this console, so it was refused.",
+    }[e.message];
+    $("run-error").textContent = why ?? `Approval could not be recorded (${e.message}). Nothing was signed.`;
     $("run-error").hidden = false;
   } finally {
     $("approve-btn").disabled = $("reject-btn").disabled = false;
