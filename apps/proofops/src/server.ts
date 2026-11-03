@@ -1,0 +1,256 @@
+// ProofOps control plane: serves the operator UI and a small JSON API, runs missions one at a time, and streams
+// live progress with Server-Sent Events. Holds the model key (if any); the browser worker never sees it.
+//   node apps/proofops/src/server.ts [--port 4317] [--planner stub|vultr --model <id>] [--sandbox]
+import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
+import { readFile, stat } from "node:fs/promises";
+import { readFileSync, mkdirSync, existsSync } from "node:fs";
+import { execFileSync } from "node:child_process";
+import { join, normalize, extname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
+import { randomBytes } from "node:crypto";
+import type { AddressInfo } from "node:net";
+import { createStorefront } from "./storefront.ts";
+import { startSigner } from "./signer.ts";
+import { stubPlanner, vultrPlanner, type Planner } from "./model.ts";
+import { runScenario, type ApprovalRequest, type RunConfig, type Tier } from "./runner.ts";
+import { SCENARIOS, findScenario, type Scenario } from "./scenarios.ts";
+import { RunStore } from "./store.ts";
+
+const arg = (name: string, fallback?: string) => {
+  const i = process.argv.indexOf(`--${name}`);
+  return i === -1 ? fallback : process.argv[i + 1];
+};
+const ROOT = resolve(fileURLToPath(new URL("../../..", import.meta.url)));
+const UI_DIR = join(ROOT, "apps", "proofops", "ui");
+const PORT = Number(arg("port", process.env.PROOFOPS_PORT ?? "4317"));
+const HOST = process.env.PROOFOPS_HOST ?? "127.0.0.1";
+const SANDBOX = process.argv.includes("--sandbox");
+const PLANNER = arg("planner", "stub")!;
+const MODEL = arg("model");
+const EVIDENCE_ROOT = resolve(ROOT, arg("evidence", SANDBOX ? "evidence" : "evidence-local")!);
+const DATA_DIR = resolve(ROOT, arg("data", "data-local")!);
+mkdirSync(EVIDENCE_ROOT, { recursive: true });
+mkdirSync(DATA_DIR, { recursive: true });
+
+let codeSha = "unknown";
+try { codeSha = execFileSync("git", ["rev-parse", "HEAD"], { cwd: ROOT, encoding: "utf8" }).trim(); } catch { /* not a checkout */ }
+
+// ---- Long-lived components: signer (own process), storefront, run registry ----
+const signer = await startSigner();
+const store = createStorefront({ approvalPublicKey: signer.publicKey });
+await new Promise<void>((r) => store.publicServer.listen(0, "127.0.0.1", r));
+await new Promise<void>((r) => store.trustedServer.listen(0, "127.0.0.1", r));
+const storefront = {
+  trustedBase: `http://127.0.0.1:${(store.trustedServer.address() as AddressInfo).port}`,
+  publicPort: (store.publicServer.address() as AddressInfo).port,
+};
+const registry = new RunStore(join(DATA_DIR, "runs.db"));
+const recovered = registry.recoverInterrupted();
+
+function makePlanner(scenario: Scenario): Planner {
+  if (PLANNER === "vultr") {
+    const envFile = process.env.PROOFOPS_INFERENCE_ENV_FILE ?? "/etc/proofops/inference.env";
+    const key = /^PROOFOPS_INFERENCE_API_KEY=(.+)$/m.exec(readFileSync(envFile, "utf8"))?.[1]?.trim();
+    if (!key || !MODEL) throw new Error("vultr planner needs --model and a key file");
+    return vultrPlanner({ apiKey: key, model: MODEL });
+  }
+  void scenario;
+  return stubPlanner();
+}
+const TIER: Tier = SANDBOX ? "LIVE_VULTR_SANDBOX" : PLANNER === "vultr" ? "LOCAL_LIVE_MODEL" : "LOCAL_MODEL_STUB";
+
+// ---- Live run state (one mission at a time keeps the demo VM predictable) ----
+interface Live {
+  runId: string;
+  scenario: Scenario;
+  status: "running" | "awaiting_approval" | "completed" | "failed" | "timed_out" | "cancelled";
+  events: Record<string, unknown>[];
+  steps: Record<string, unknown>[];
+  pendingApproval: (ApprovalRequest & { resolve: (token: string | null) => void }) | null;
+  abort: AbortController;
+  result: Record<string, unknown> | null;
+  listeners: Set<ServerResponse>;
+}
+let active: Live | null = null;
+const finished = new Map<string, Live>();
+
+function broadcast(live: Live, type: string, data: unknown) {
+  const msg = `event: ${type}\ndata: ${JSON.stringify(data)}\n\n`;
+  for (const res of live.listeners) res.write(msg);
+}
+
+function snapshot(l: Live) {
+  return {
+    runId: l.runId, scenario: l.scenario, status: l.status, tier: TIER, planner: PLANNER === "vultr" ? MODEL : "local-model-stub",
+    events: l.events, steps: l.steps, result: l.result,
+    pendingApproval: l.pendingApproval ? { stepIndex: l.pendingApproval.stepIndex, element: l.pendingApproval.element, cart: l.pendingApproval.cart, payloadSha256: l.pendingApproval.payloadSha256 } : null,
+  };
+}
+
+async function startRun(scenario: Scenario, idempotencyKey: string | null): Promise<{ runId: string; created: boolean }> {
+  const runId = `run_${new Date().toISOString().replace(/[-:.TZ]/g, "").slice(0, 14)}_${randomBytes(4).toString("hex")}`;
+  const reg = registry.create({ id: runId, idempotencyKey, mode: scenario.mode, tier: TIER });
+  if (!reg.created) return { runId: reg.run.id, created: false };
+  registry.update(runId, { status: "running" });
+  const live: Live = { runId, scenario, status: "running", events: [], steps: [], pendingApproval: null, abort: new AbortController(), result: null, listeners: new Set() };
+  active = live;
+  const cfg: RunConfig = {
+    runId, mode: scenario.mode, task: scenario.task, ordersExpected: scenario.ordersExpected,
+    planner: makePlanner(scenario), tier: TIER, storefront,
+    worker: SANDBOX
+      ? { kind: "sandbox", socketRoot: "/run/proofops", limits: { image: arg("image", "proofops-worker:1.64.1")!, runtime: "runsc", memoryMb: 1024, cpus: 1, pids: 256, chromiumNoSandbox: process.argv.includes("--chromium-no-sandbox") } }
+      : { kind: "local" },
+    evidenceRoot: EVIDENCE_ROOT, codeSha, deployment: arg("deployment", SANDBOX ? "vultr" : "local")!,
+    wallClockMs: scenario.wallClockMs, signal: live.abort.signal,
+    observer: (e) => {
+      (e.kind === "event" ? live.events : live.steps).push(e.data);
+      broadcast(live, e.kind, e.data);
+    },
+    approval: scenario.approvals === "operator"
+      ? (req) => new Promise<string | null>((resolveApproval) => {
+          const timer = setTimeout(() => settle(null), 120_000);
+          const settle = (token: string | null) => { clearTimeout(timer); live.pendingApproval = null; live.status = "running"; resolveApproval(token); };
+          live.pendingApproval = { ...req, resolve: settle };
+          live.status = "awaiting_approval";
+          broadcast(live, "approval", snapshot(live).pendingApproval);
+          live.abort.signal.addEventListener("abort", () => settle(null), { once: true });
+        })
+      : undefined,
+  };
+  void runScenario(cfg)
+    .then((r) => {
+      live.status = r.status;
+      live.result = { verdict: r.verdict, outcomes: r.report.outcomes, checks: r.report.checks, error: r.error, evidenceDir: r.evidenceDir, steps: r.steps };
+      registry.update(runId, { status: r.status, verdict: r.verdict, error: r.error, evidenceDir: r.evidenceDir });
+    })
+    .catch((e: Error) => {
+      live.status = "failed";
+      live.result = { verdict: "INCONCLUSIVE", error: e.message };
+      registry.update(runId, { status: "failed", error: e.message });
+    })
+    .finally(() => {
+      broadcast(live, "done", snapshot(live));
+      for (const res of live.listeners) res.end();
+      live.listeners.clear();
+      finished.set(runId, live);
+      if (active === live) active = null;
+    });
+  return { runId, created: true };
+}
+
+// ---- HTTP ----
+const MIME: Record<string, string> = { ".html": "text/html; charset=utf-8", ".js": "text/javascript; charset=utf-8", ".css": "text/css; charset=utf-8",
+  ".png": "image/png", ".json": "application/json", ".jsonl": "application/x-ndjson", ".md": "text/markdown; charset=utf-8", ".svg": "image/svg+xml" };
+const SECURITY_HEADERS = {
+  "x-content-type-options": "nosniff", "referrer-policy": "no-referrer", "x-frame-options": "DENY",
+  "content-security-policy": "default-src 'self'; img-src 'self' data:; style-src 'self'; script-src 'self'; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'",
+};
+const json = (res: ServerResponse, status: number, body: unknown) => {
+  res.writeHead(status, { "content-type": "application/json", "cache-control": "no-store", ...SECURITY_HEADERS });
+  res.end(JSON.stringify(body));
+};
+async function readJson(req: IncomingMessage): Promise<Record<string, unknown>> {
+  let raw = "";
+  for await (const c of req) { raw += c; if (raw.length > 8_192) throw new Error("too large"); }
+  return raw ? (JSON.parse(raw) as Record<string, unknown>) : {};
+}
+// Mutating calls must come from this UI (same-origin fetch with a custom header), which blocks cross-site forms.
+const sameOrigin = (req: IncomingMessage) => req.headers["x-proofops"] === "1";
+const perIp = new Map<string, number[]>();
+function rateLimited(req: IncomingMessage): boolean {
+  const ip = req.socket.remoteAddress ?? "?";
+  const now = Date.now();
+  const hits = (perIp.get(ip) ?? []).filter((t) => now - t < 60_000);
+  hits.push(now);
+  perIp.set(ip, hits);
+  return hits.length > 10;
+}
+
+async function serveFile(res: ServerResponse, base: string, rel: string) {
+  const full = normalize(join(base, rel));
+  if (!full.startsWith(base)) return json(res, 403, { error: "forbidden" });
+  try {
+    if (!(await stat(full)).isFile()) throw new Error();
+    res.writeHead(200, { "content-type": MIME[extname(full)] ?? "application/octet-stream", "cache-control": "no-store", ...SECURITY_HEADERS });
+    res.end(await readFile(full));
+  } catch {
+    json(res, 404, { error: "not_found" });
+  }
+}
+
+const server = createServer(async (req, res) => {
+  try {
+    const url = new URL(req.url ?? "/", "http://ui.local");
+    const p = url.pathname;
+    if (req.method === "GET" && p === "/api/health") {
+      return json(res, 200, { ok: true, service: "jarvis-proofops", tier: TIER, planner: PLANNER === "vultr" ? { provider: "vultr-serverless-inference", model: MODEL } : { provider: "local-model-stub" },
+        isolation: SANDBOX ? "gvisor-runsc" : "none (local development)", codeSha: codeSha.slice(0, 12), active: active?.runId ?? null, recoveredOnStart: recovered });
+    }
+    if (req.method === "GET" && p === "/api/scenarios") return json(res, 200, SCENARIOS);
+    if (req.method === "GET" && p === "/api/runs") return json(res, 200, registry.list(30));
+    if (req.method === "POST" && p === "/api/runs") {
+      if (!sameOrigin(req)) return json(res, 403, { error: "missing_ui_header" });
+      if (rateLimited(req)) return json(res, 429, { error: "rate_limited" });
+      const body = await readJson(req);
+      const scenario = findScenario(String(body.scenario ?? ""));
+      if (!scenario) return json(res, 400, { error: "unknown_scenario" });
+      if (active) return json(res, 409, { error: "busy", activeRunId: active.runId });
+      const key = typeof req.headers["idempotency-key"] === "string" ? req.headers["idempotency-key"].slice(0, 128) : null;
+      return json(res, 202, await startRun(scenario, key));
+    }
+    const m = /^\/api\/runs\/(run_[0-9]{14}_[0-9a-f]{8})(\/.*)?$/.exec(p);
+    if (m) {
+      const id = m[1]!;
+      const sub = m[2] ?? "";
+      const live = active?.runId === id ? active : finished.get(id);
+      if (req.method === "GET" && sub === "") return live ? json(res, 200, snapshot(live)) : registry.get(id) ? json(res, 200, { runId: id, row: registry.get(id) }) : json(res, 404, { error: "not_found" });
+      if (req.method === "GET" && sub === "/stream") {
+        if (!live) return json(res, 404, { error: "not_found" });
+        res.writeHead(200, { "content-type": "text/event-stream", "cache-control": "no-store", connection: "keep-alive", ...SECURITY_HEADERS });
+        res.write(`event: snapshot\ndata: ${JSON.stringify(snapshot(live))}\n\n`);
+        if (live !== active) { res.write(`event: done\ndata: ${JSON.stringify(snapshot(live))}\n\n`); return res.end(); }
+        live.listeners.add(res);
+        req.on("close", () => live.listeners.delete(res));
+        return;
+      }
+      if (req.method === "POST" && (sub === "/approve" || sub === "/reject")) {
+        if (!sameOrigin(req)) return json(res, 403, { error: "missing_ui_header" });
+        if (!live?.pendingApproval) return json(res, 409, { error: "no_pending_approval" });
+        const body = await readJson(req);
+        if (body.payloadSha256 !== live.pendingApproval.payloadSha256) return json(res, 409, { error: "approval_payload_changed" });
+        if (sub === "/reject") { live.pendingApproval.resolve(null); return json(res, 200, { ok: true }); }
+        const token = await signer.sign({ operator: "demo-operator", workspace: "demo-workspace", runId: id, payloadSha256: live.pendingApproval.payloadSha256 });
+        live.pendingApproval.resolve(token);
+        return json(res, 200, { ok: true });
+      }
+      if (req.method === "POST" && sub === "/cancel") {
+        if (!sameOrigin(req)) return json(res, 403, { error: "missing_ui_header" });
+        if (live !== active || !live) return json(res, 409, { error: "not_running" });
+        live.abort.abort();
+        return json(res, 202, { ok: true });
+      }
+      const f = /^\/evidence\/([A-Za-z0-9._/-]{1,120})$/.exec(sub);
+      if (req.method === "GET" && f && !f[1]!.includes("..")) return serveFile(res, join(EVIDENCE_ROOT, id), f[1]!);
+      return json(res, 404, { error: "not_found" });
+    }
+    if (req.method === "GET") return serveFile(res, UI_DIR, p === "/" ? "index.html" : p.slice(1));
+    return json(res, 405, { error: "method_not_allowed" });
+  } catch (e) {
+    return json(res, 400, { error: "bad_request", detail: (e as Error).message.slice(0, 120) });
+  }
+});
+
+server.listen(PORT, HOST, () => {
+  console.log(`JARVIS ProofOps control plane on http://${HOST}:${PORT}  (tier ${TIER}, code ${codeSha.slice(0, 7)})`);
+  if (!existsSync(join(UI_DIR, "index.html"))) console.log("warning: UI files missing");
+});
+const shutdown = async () => {
+  active?.abort.abort();
+  server.close();
+  signer.stop();
+  await store.close();
+  registry.close();
+  process.exit(0);
+};
+process.on("SIGINT", shutdown);
+process.on("SIGTERM", shutdown);

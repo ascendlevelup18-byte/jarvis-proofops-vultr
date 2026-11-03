@@ -124,8 +124,13 @@ export function stubPlanner(inject?: (step: number, o: Observation) => unknown):
       const by = (pred: (e: Observation["elements"][number]) => boolean) => o.elements.find(pred);
       const path = new URL(o.url).pathname;
       let action: unknown;
+      const wantsOrder = /operator approval/i.test(turn.task);
       if (forced !== undefined) action = forced;
-      else if (/\/checkout$/.test(path)) action = { tool: "finish", note: "checkout reached" };
+      else if (/\/checkout\/submit$/.test(path)) action = { tool: "finish", note: "order step done" };
+      else if (/\/checkout$/.test(path) && wantsOrder) {
+        const order = by((e) => e.consequential === true);
+        action = order ? { tool: "request_approval", ref: order.ref, epoch: o.epoch, reason: "placing the order needs the operator" } : { tool: "finish", note: "no order button" };
+      } else if (/\/checkout$/.test(path)) action = { tool: "finish", note: "checkout reached" };
       else if (/\/cart$/.test(path)) {
         const code = by((e) => e.name === "code");
         const discountShown = /SAVE10/.test(o.text);

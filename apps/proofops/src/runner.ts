@@ -14,11 +14,27 @@ import { launchWorker, type SandboxLimits, type WorkerHandle } from "./worker-cl
 import type { ModelCallRecord, Planner } from "./model.ts";
 import { verify, type VerifierReport } from "./verifier.ts";
 import { STORE_HOST, type SessionState } from "./storefront.ts";
+import { cartPayloadSha256 } from "./approval.ts";
 
 export type Tier = "LOCAL_MODEL_STUB" | "LOCAL_LIVE_MODEL" | "LIVE_VULTR_SANDBOX";
 
+export interface ApprovalRequest {
+  runId: string;
+  stepIndex: number;
+  element: string;
+  cart: { sku: string; quantity: number; coupon: string | null; totalCents: number };
+  payloadSha256: string;
+}
+
 export interface RunConfig {
   mode: FixtureMode;
+  runId?: string;
+  task?: string;
+  ordersExpected?: number;
+  /** Operator approval for consequential steps. Returns a signed one-time token, or null when refused or timed out. */
+  approval?: (req: ApprovalRequest) => Promise<string | null>;
+  /** Live feed for the UI: every event and every step record as it happens. */
+  observer?: (e: { kind: "event" | "step"; data: Record<string, unknown> }) => void;
   planner: Planner;
   tier: Tier;
   storefront: { trustedBase: string; publicPort: number };
@@ -41,6 +57,7 @@ export interface StepRecord {
   proposal: unknown;
   policy: PolicyDecision;
   dispatched: boolean;
+  approved?: boolean;
   result?: string;
 }
 
@@ -66,7 +83,7 @@ async function listen(server: Server, where: { port: number; host: string } | { 
 }
 
 export async function runScenario(cfg: RunConfig): Promise<RunResult> {
-  const runId = newRunId();
+  const runId = cfg.runId ?? newRunId();
   const maxSteps = cfg.maxSteps ?? 12;
   const deadline = Date.now() + (cfg.wallClockMs ?? 120_000);
   const maxModelCalls = cfg.maxModelCalls ?? 14;
@@ -75,7 +92,11 @@ export async function runScenario(cfg: RunConfig): Promise<RunResult> {
   await mkdir(join(dir, "observations"), { recursive: true });
 
   const events: Record<string, unknown>[] = [];
-  const ev = (type: string, data: Record<string, unknown> = {}) => events.push({ at: new Date().toISOString(), runId, type, ...data });
+  const ev = (type: string, data: Record<string, unknown> = {}) => {
+    const e = { at: new Date().toISOString(), runId, type, ...data };
+    events.push(e);
+    cfg.observer?.({ kind: "event", data: e });
+  };
   const files: Record<string, string> = {}; // relative path -> sha256
   const put = async (rel: string, data: Buffer | string) => {
     await writeFile(join(dir, rel), data);
@@ -83,7 +104,7 @@ export async function runScenario(cfg: RunConfig): Promise<RunResult> {
   };
 
   // 1. Freeze the assertions before anything else happens.
-  const spec: FrozenSpec = freezeSpec(cfg.mode);
+  const spec: FrozenSpec = freezeSpec(cfg.mode, cfg.task, cfg.ordersExpected ?? 0);
   await put("spec.json", JSON.stringify(spec, null, 2));
   ev("spec.frozen", { specSha256: spec.specSha256 });
 
@@ -104,7 +125,11 @@ export async function runScenario(cfg: RunConfig): Promise<RunResult> {
   const gatewayEvents: GatewayEvent[] = [];
   const gateway = createGateway({
     runId, allowedHost: STORE_HOST, allowedPathPrefix: basePath,
-    upstream: { host: "127.0.0.1", port: cfg.storefront.publicPort }, onEvent: (e) => gatewayEvents.push(e),
+    upstream: { host: "127.0.0.1", port: cfg.storefront.publicPort },
+    onEvent: (e) => {
+      gatewayEvents.push(e);
+      if (e.decision === "deny") ev("gateway.denied", { reason: e.reason, method: e.method, target: e.target });
+    },
   });
   let socketDir: string | null = null;
   let proxyUrl = "";
@@ -128,11 +153,13 @@ export async function runScenario(cfg: RunConfig): Promise<RunResult> {
   let dom: { subtotal: string | null; discount: string | null; total: string | null; checkoutMarker: boolean } | null = null;
   let cleanup = { workerGone: null as boolean | null, detail: "not started" };
   let screenshotCount = 0;
+  let approvalsGranted = 0;
 
   const shot = async (name: string) => {
-    const r = await worker!.call<{ png: string }>("screenshot", {}, 15_000);
+    const r = await worker!.call<{ png: string; url: string }>("screenshot", {}, 15_000);
     await put(`screenshots/${name}.png`, Buffer.from(r.png, "base64"));
     screenshotCount += 1;
+    ev("screenshot", { file: `screenshots/${name}.png`, url: r.url });
   };
 
   try {
@@ -175,9 +202,47 @@ export async function runScenario(cfg: RunConfig): Promise<RunResult> {
           : checkAction(call.parsed, obs, scope, step);
       const rec: StepRecord = { step, at: new Date().toISOString(), observationEpoch: obs.epoch, model: call, proposal: call.parsed, policy: decision, dispatched: false };
       steps.push(rec);
-      ev("policy.decision", { step, decision: decision.decision, rule: decision.rule });
+      ev("policy.decision", { step, decision: decision.decision, rule: decision.rule, detail: "detail" in decision ? decision.detail : undefined });
+
+      if (decision.decision === "needs_approval" && cfg.approval) {
+        // Pause for a human. The cart shown for approval comes from the store's own server state, not the page.
+        const a = call.parsed as { ref: string; epoch: number };
+        const st = (await (await fetch(`${cfg.storefront.trustedBase}/sessions/${sid}`)).json()) as SessionState;
+        if (st.cart && st.totals) {
+          const cart = { sku: st.cart.sku, quantity: st.cart.quantity, coupon: st.coupon, totalCents: st.totals.totalCents };
+          const payloadSha256 = cartPayloadSha256(cart);
+          ev("approval.requested", { step, cart, payloadSha256 });
+          const token = await cfg.approval({ runId, stepIndex: step, element: obs.elements.find((e) => e.ref === a.ref)?.text ?? a.ref, cart, payloadSha256 });
+          if (token) {
+            approvalsGranted += 1;
+            ev("approval.granted", { step, payloadSha256 });
+            try {
+              const r = await worker.call<{ url: string }>("submitApproved", { ref: a.ref, epoch: a.epoch, token });
+              rec.dispatched = true;
+              rec.approved = true;
+              rec.result = `approved and submitted: ${r.url}`;
+            } catch (e) {
+              rec.dispatched = true;
+              rec.approved = true;
+              rec.result = `worker error: ${(e as Error).message}`;
+            }
+            await shot(`step-${String(step).padStart(2, "0")}-approved`);
+            // Negative control: replay the same token straight at the store, bypassing the browser and policy.
+            const replay = await fetch(`http://127.0.0.1:${cfg.storefront.publicPort}${basePath}checkout/submit`, {
+              method: "POST", body: new URLSearchParams({ approval: token }), redirect: "manual",
+            }).catch(() => null);
+            ev("approval.replay_probe", { status: replay?.status ?? null, refused: replay?.status === 403 });
+          } else {
+            rec.result = "operator did not approve";
+            ev("approval.refused", { step });
+          }
+          cfg.observer?.({ kind: "step", data: rec as unknown as Record<string, unknown> });
+          continue;
+        }
+      }
 
       if (decision.decision !== "allow") {
+        cfg.observer?.({ kind: "step", data: { ...rec, result: decision.detail } as unknown as Record<string, unknown> });
         rec.result = decision.detail;
         consecutiveInvalid = decision.rule === "invalid_model_output" || decision.rule === "model_error" ? consecutiveInvalid + 1 : 0;
         if (consecutiveInvalid >= 3) { status = "failed"; error = "three consecutive unusable model replies"; break; }
@@ -185,7 +250,12 @@ export async function runScenario(cfg: RunConfig): Promise<RunResult> {
       }
       consecutiveInvalid = 0;
       const d = decision.dispatch;
-      if (d.op === "finish") { rec.dispatched = true; rec.result = "finished"; break; }
+      if (d.op === "finish") {
+        rec.dispatched = true;
+        rec.result = "finished (the planner's claim is not the verdict)";
+        cfg.observer?.({ kind: "step", data: rec as unknown as Record<string, unknown> });
+        break;
+      }
       try {
         const r = await worker.call<{ url: string }>(d.op, d.op === "navigate" ? { url: d.url } : d.op === "click" ? { ref: d.ref, epoch: d.epoch } : { ref: d.ref, epoch: d.epoch, value: d.value });
         rec.dispatched = true;
@@ -193,8 +263,14 @@ export async function runScenario(cfg: RunConfig): Promise<RunResult> {
       } catch (e) {
         rec.dispatched = true;
         rec.result = `worker error: ${(e as Error).message}`;
+        // A browser that stops answering is a hang, not a step failure: stop the run now.
+        if (/worker_timeout|Timeout \d+ms exceeded/.test((e as Error).message)) {
+          cfg.observer?.({ kind: "step", data: rec as unknown as Record<string, unknown> });
+          throw e;
+        }
       }
       if (step === 0 || d.op === "click") await shot(`step-${String(step).padStart(2, "0")}`);
+      cfg.observer?.({ kind: "step", data: rec as unknown as Record<string, unknown> });
     }
     if (status === "completed" && steps.length >= maxSteps && steps.at(-1)?.policy.decision !== "allow") {
       // Ran out of steps without a finish.
@@ -220,8 +296,10 @@ export async function runScenario(cfg: RunConfig): Promise<RunResult> {
     const netlog = await worker.call<{ entries: unknown[] }>("netlog").catch(() => ({ entries: [] }));
     await put("worker-network.json", JSON.stringify(netlog.entries, null, 2));
   } catch (e) {
-    status = stopReason ?? "failed";
-    error = stopReason === "timed_out" ? "wall clock limit reached" : stopReason === "cancelled" ? "cancelled by operator" : (e as Error).message.slice(0, 300);
+    const hung = /worker_timeout|Timeout \d+ms exceeded/.test((e as Error).message);
+    status = stopReason ?? (hung ? "timed_out" : "failed");
+    error = stopReason === "timed_out" ? "wall clock limit reached" : stopReason === "cancelled" ? "cancelled by operator"
+      : hung ? `browser stopped responding (${(e as Error).message.slice(0, 80)})` : (e as Error).message.slice(0, 300);
     ev("run.error", { error });
   } finally {
     // 5. Teardown is unconditional and confirmed.
@@ -261,9 +339,10 @@ export async function runScenario(cfg: RunConfig): Promise<RunResult> {
     server,
     policy: {
       dispatched: steps.filter((s) => s.dispatched).length,
-      dispatchedWithoutAllow: steps.filter((s) => s.dispatched && s.policy.decision !== "allow").length,
+      dispatchedWithoutAllow: steps.filter((s) => s.dispatched && s.policy.decision !== "allow" && !s.approved).length,
       denied: steps.filter((s) => s.policy.decision === "deny").length,
       needsApproval: steps.filter((s) => s.policy.decision === "needs_approval").length,
+      approvalsGranted,
     },
     network: { measured: true, deniedRequests: gatewayEvents.filter((g) => g.decision === "deny").length, allowedOffScope },
     evidence: { screenshots: screenshotCount, hashesMatch },

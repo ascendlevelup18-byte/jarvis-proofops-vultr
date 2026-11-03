@@ -1,0 +1,324 @@
+// JARVIS ProofOps operator UI. Every indicator is driven by data from the control plane; nothing is simulated.
+const $ = (id) => document.getElementById(id);
+const el = (tag, cls, text) => {
+  const n = document.createElement(tag);
+  if (cls) n.className = cls;
+  if (text !== undefined) n.textContent = text;
+  return n;
+};
+const api = async (path, opts = {}) => {
+  const res = await fetch(path, { ...opts, headers: { "content-type": "application/json", "x-proofops": "1", ...(opts.headers ?? {}) } });
+  const body = await res.json().catch(() => ({}));
+  if (!res.ok) throw Object.assign(new Error(body.error ?? `HTTP ${res.status}`), { status: res.status, body });
+  return body;
+};
+const usd = (cents) => (typeof cents === "number" ? `${cents < 0 ? "-" : ""}$${(Math.abs(cents) / 100).toFixed(2)}` : String(cents ?? "—"));
+
+let scenarios = [];
+let selected = null;
+let current = null; // { runId, stream, screenshots[], containment[], stepsSeen }
+
+// ---------- environment ----------
+async function loadHealth() {
+  const env = $("env");
+  env.replaceChildren();
+  try {
+    const h = await api("/api/health");
+    const add = (text, cls, title) => { const c = el("li", `chip ${cls}`, text); if (title) c.title = title; env.append(c); };
+    const live = h.tier === "LIVE_VULTR_SANDBOX";
+    add(h.planner.provider === "vultr-serverless-inference" ? `Model: ${h.planner.model} (Vultr Serverless Inference)` : "Model: scripted stub (local)",
+      h.planner.provider === "vultr-serverless-inference" ? "ok" : "warn", "Which planner proposes actions in this deployment");
+    add(live ? "Sandbox: gVisor (runsc)" : "Sandbox: none (local development)", live ? "ok" : "warn", "Browser worker isolation in this deployment");
+    add(`Code ${h.codeSha}`, "", "Git commit of the running control plane");
+    if (h.active) add("Mission in progress", "warn");
+  } catch {
+    env.append(el("li", "chip warn", "Control plane unreachable"));
+  }
+}
+
+// ---------- missions ----------
+function renderScenarios() {
+  const list = $("scenario-list");
+  list.replaceChildren();
+  for (const s of scenarios) {
+    const b = el("button", "scenario");
+    b.type = "button";
+    b.setAttribute("role", "radio");
+    b.setAttribute("aria-checked", String(selected?.id === s.id));
+    b.append(el("strong", "", s.title), el("span", "", s.purpose));
+    b.addEventListener("click", () => { selected = s; renderScenarios(); $("run-btn").disabled = Boolean(current?.running); });
+    list.append(b);
+  }
+}
+
+async function loadHistory() {
+  try {
+    const rows = await api("/api/runs");
+    const ol = $("history");
+    ol.replaceChildren();
+    for (const r of rows.slice(0, 8)) {
+      const li = el("li");
+      const sc = el("span", "mono", r.id.slice(-8));
+      const v = el("span", `badge ${r.verdict === "PASS" ? "allow" : r.verdict ? "deny" : "gw"}`, r.verdict ?? r.status);
+      li.append(el("span", "", r.mode), sc, v);
+      ol.append(li);
+    }
+  } catch { /* history is optional */ }
+}
+
+// ---------- run lifecycle ----------
+function resetRunView(scenario, runId) {
+  $("run-scenario").textContent = `Mission · ${scenario.title}`;
+  $("run-title").textContent = scenario.purpose;
+  $("run-id").textContent = runId;
+  $("timeline").replaceChildren();
+  $("containment").replaceChildren(el("li", "empty", "Nothing blocked yet."));
+  $("evidence").replaceChildren(el("li", "empty", "Available when the run ends."));
+  $("thumbs").replaceChildren();
+  $("shot").hidden = true;
+  $("shot-empty").hidden = false;
+  $("shot-label").textContent = "";
+  $("verdict").className = "verdict pending";
+  $("verdict").textContent = "Run in progress. The verifier decides at the end.";
+  $("outcomes").replaceChildren();
+  $("checks").hidden = true;
+  $("approval").hidden = true;
+  for (const li of document.querySelectorAll("#pipeline li")) li.className = "";
+}
+
+function stage(name, state) {
+  const li = document.querySelector(`#pipeline li[data-stage="${name}"]`);
+  if (!li) return;
+  const order = ["propose", "policy", "execute", "verify", "evidence", "teardown"];
+  if (state === "active") {
+    for (const s of order.slice(0, order.indexOf(name))) {
+      const prev = document.querySelector(`#pipeline li[data-stage="${s}"]`);
+      if (prev && !prev.classList.contains("bad")) prev.className = "done";
+    }
+  }
+  li.className = state;
+}
+
+function setStatus(status) {
+  const s = $("run-status");
+  s.className = `status ${status}`;
+  s.textContent = { running: "Running", awaiting_approval: "Awaiting approval", completed: "Completed", failed: "Failed", timed_out: "Timed out", cancelled: "Cancelled" }[status] ?? status;
+  $("cancel-btn").hidden = !(status === "running" || status === "awaiting_approval");
+}
+
+function describe(p) {
+  if (!p || typeof p !== "object") return "unusable model reply";
+  switch (p.tool) {
+    case "navigate": return `navigate ${p.path}`;
+    case "click": return `click ${p.ref} (epoch ${p.epoch})`;
+    case "fill": return `fill ${p.ref} = "${p.value}"`;
+    case "request_approval": return `request approval for ${p.ref}`;
+    case "finish": return `finish${p.note ? `: ${p.note}` : ""}`;
+    default: return JSON.stringify(p).slice(0, 80);
+  }
+}
+
+function addStep(s) {
+  const tl = $("timeline");
+  tl.querySelector(".empty")?.remove();
+  const li = el("li", "step");
+  const top = el("div", "top");
+  top.append(el("span", "tool", `${s.step + 1}. ${describe(s.proposal)}`));
+  const decision = s.approved ? "approved" : s.policy?.decision ?? "deny";
+  const label = { allow: "ALLOWED", deny: "REFUSED", needs_approval: "NEEDS APPROVAL", approved: "OPERATOR APPROVED" }[decision] ?? decision;
+  top.append(el("span", `badge ${decision}`, label));
+  li.append(top);
+  const why = [];
+  if (s.proposal?.reason) why.push(`Model's reason: "${s.proposal.reason}"`);
+  if (s.policy?.decision !== "allow" && s.policy?.rule) why.push(`Policy: ${s.policy.rule.replaceAll("_", " ")}${s.policy.detail ? ` (${s.policy.detail})` : ""}`);
+  if (s.result) why.push(s.dispatched ? `Result: ${s.result}` : "Not dispatched to the browser");
+  if (s.model?.provider) why.push(`${s.model.provider === "local-model-stub" ? "Scripted stub" : `Vultr ${s.model.responseModel ?? s.model.requestedModel}`}${s.model.latencyMs ? ` · ${s.model.latencyMs} ms` : ""}`);
+  for (const w of why) li.append(el("div", "why", w));
+  tl.append(li);
+  li.scrollIntoView({ block: "nearest", behavior: "smooth" });
+  if (decision === "deny" || decision === "needs_approval") {
+    addContainment(`Refused before dispatch: ${describe(s.proposal)}`, s.policy?.rule ?? "");
+  }
+}
+
+function addContainment(text, detail, kind = "policy") {
+  const ul = $("containment");
+  ul.querySelector(".empty")?.remove();
+  const li = el("li");
+  li.append(el("span", `badge ${kind === "network" ? "gw" : "deny"}`, kind === "network" ? "NETWORK" : "POLICY"), document.createTextNode(" "), el("span", "", text));
+  if (detail) li.append(el("div", "mono small", detail));
+  ul.append(li);
+}
+
+function showShot(file) {
+  if (!current) return;
+  const src = `/api/runs/${current.runId}/evidence/${file}`;
+  $("shot").src = src;
+  $("shot").hidden = false;
+  $("shot-empty").hidden = true;
+  $("shot-label").textContent = file.replace("screenshots/", "");
+  for (const b of $("thumbs").children) b.setAttribute("aria-current", String(b.dataset.file === file));
+}
+
+function addShot(file) {
+  const b = el("button");
+  b.type = "button";
+  b.dataset.file = file;
+  b.setAttribute("aria-label", `Show ${file}`);
+  const img = el("img");
+  img.src = `/api/runs/${current.runId}/evidence/${file}`;
+  img.alt = "";
+  b.append(img);
+  b.addEventListener("click", () => showShot(file));
+  $("thumbs").append(b);
+  showShot(file);
+}
+
+function onEvent(e) {
+  switch (e.type) {
+    case "spec.frozen": stage("propose", "active"); break;
+    case "policy.decision": stage("policy", "active"); break;
+    case "gateway.denied": addContainment(`${e.method} ${e.target}`, `Gateway refused: ${e.reason.replaceAll("_", " ")}`, "network"); break;
+    case "screenshot": stage("execute", "active"); addShot(e.file); break;
+    case "approval.replay_probe":
+      addContainment(`Replay of the used approval sent straight to the store: HTTP ${e.status}`, e.refused ? "Store refused the replay" : "Store did NOT refuse the replay", "policy");
+      break;
+    case "verifier.dom_read": stage("verify", "active"); break;
+    case "run.wall_clock_expired": addContainment("Wall-clock limit reached: worker destroyed", "Hard stop", "network"); break;
+    case "cleanup.done": stage("evidence", "done"); stage("teardown", e.workerGone ? "done" : "bad"); break;
+  }
+}
+
+function showApproval(p) {
+  if (!p) { $("approval").hidden = true; return; }
+  $("approval").hidden = false;
+  $("approval-element").textContent = p.element || "submit the order";
+  const dl = $("approval-cart");
+  dl.replaceChildren();
+  for (const [k, v] of [["Item", `${p.cart.sku} × ${p.cart.quantity}`], ["Promo code", p.cart.coupon ?? "none"], ["Order total", usd(p.cart.totalCents)]]) {
+    dl.append(el("dt", "", k), el("dd", "", v));
+  }
+  $("approval-hash").textContent = p.payloadSha256.slice(0, 24) + "…";
+  $("approval").dataset.hash = p.payloadSha256;
+  $("approve-btn").focus();
+}
+
+function renderResult(snap) {
+  const r = snap.result;
+  if (!r) return;
+  const v = $("verdict");
+  v.className = `verdict ${r.verdict}`;
+  v.textContent = r.verdict === "PASS" ? "VERIFIED PASS" : r.verdict === "FAIL" ? "VERIFIED FAIL" : "INCONCLUSIVE";
+  const blocked = $("containment").querySelectorAll("li:not(.empty)").length;
+  const sub = [r.error ? `Run ${snap.status.replace("_", " ")}: ${r.error}` : `Run ${snap.status.replace("_", " ")}`];
+  if (blocked) sub.push(`CONTAINED: ${blocked} attempt${blocked === 1 ? "" : "s"} blocked`);
+  v.append(el("small", "", sub.join(" · ")));
+  const oc = $("outcomes");
+  oc.replaceChildren();
+  for (const [k, val] of Object.entries(r.outcomes ?? {})) {
+    const li = el("li", val, k);
+    li.append(el("b", "", val === "INCONCLUSIVE" ? "UNSURE" : val));
+    oc.append(li);
+  }
+  const tbody = $("checks").querySelector("tbody");
+  tbody.replaceChildren();
+  const money = new Set(["dom.subtotal", "dom.discount", "dom.total", "server.subtotal", "server.discount", "server.total"]);
+  for (const c of r.checks ?? []) {
+    const tr = el("tr", c.outcome);
+    const fmt = (x) => (x === undefined ? "" : money.has(c.name) && typeof x === "number" ? usd(x) : typeof x === "object" ? JSON.stringify(x) : String(x));
+    tr.append(el("td", "", c.name), el("td", "", fmt(c.expected)), el("td", "", fmt(c.observed)), el("td", c.outcome, c.outcome));
+    tbody.append(tr);
+  }
+  $("checks").hidden = false;
+  stage("verify", r.verdict === "PASS" ? "done" : "bad");
+  const ev = $("evidence");
+  ev.replaceChildren();
+  for (const [f, label] of [["report.md", "Run report"], ["manifest.json", "Manifest with file hashes"], ["assertions.json", "Verifier output"], ["policy-decisions.jsonl", "Policy decisions"],
+    ["model-calls.jsonl", "Model calls (redacted)"], ["gateway.jsonl", "Gateway log"], ["server-state.json", "Store server state"], ["cleanup.json", "Teardown record"], ["spec.json", "Frozen spec"]]) {
+    const li = el("li");
+    const a = el("a", "", label);
+    a.href = `/api/runs/${snap.runId}/evidence/${f}`;
+    a.target = "_blank";
+    a.rel = "noopener";
+    li.append(a);
+    ev.append(li);
+  }
+}
+
+async function startRun() {
+  if (!selected) return;
+  $("run-error").hidden = true;
+  $("run-btn").disabled = true;
+  try {
+    const { runId } = await api("/api/runs", { method: "POST", body: JSON.stringify({ scenario: selected.id }), headers: { "idempotency-key": crypto.randomUUID() } });
+    current = { runId, running: true };
+    resetRunView(selected, runId);
+    setStatus("running");
+    $("main").focus();
+    follow(runId);
+  } catch (e) {
+    $("run-error").textContent = e.status === 409 ? "Another mission is still running. Wait for it to finish." : `Could not start: ${e.message}`;
+    $("run-error").hidden = false;
+    $("run-btn").disabled = false;
+  }
+}
+
+function follow(runId) {
+  const es = new EventSource(`/api/runs/${runId}/stream`);
+  current.stream = es;
+  let seenSteps = 0;
+  let seenEvents = 0;
+  es.addEventListener("snapshot", (m) => {
+    const s = JSON.parse(m.data);
+    s.events.slice(seenEvents).forEach(onEvent);
+    seenEvents = s.events.length;
+    s.steps.slice(seenSteps).forEach(addStep);
+    seenSteps = s.steps.length;
+    setStatus(s.status);
+    showApproval(s.pendingApproval);
+  });
+  es.addEventListener("event", (m) => { seenEvents++; onEvent(JSON.parse(m.data)); });
+  es.addEventListener("step", (m) => { seenSteps++; addStep(JSON.parse(m.data)); });
+  es.addEventListener("approval", (m) => { setStatus("awaiting_approval"); showApproval(JSON.parse(m.data)); });
+  es.addEventListener("done", (m) => {
+    const s = JSON.parse(m.data);
+    es.close();
+    current.running = false;
+    setStatus(s.status);
+    showApproval(null);
+    renderResult(s);
+    $("run-btn").disabled = !selected;
+    loadHistory();
+    loadHealth();
+  });
+  es.onerror = () => { if (current?.running) $("run-status").textContent = "Reconnecting…"; };
+}
+
+async function decide(kind) {
+  if (!current) return;
+  $("approve-btn").disabled = $("reject-btn").disabled = true;
+  try {
+    await api(`/api/runs/${current.runId}/${kind}`, { method: "POST", body: JSON.stringify({ payloadSha256: $("approval").dataset.hash }) });
+    showApproval(null);
+    setStatus("running");
+  } catch (e) {
+    $("run-error").textContent = `Approval failed: ${e.message}`;
+    $("run-error").hidden = false;
+  } finally {
+    $("approve-btn").disabled = $("reject-btn").disabled = false;
+  }
+}
+
+$("run-btn").addEventListener("click", startRun);
+$("approve-btn").addEventListener("click", () => decide("approve"));
+$("reject-btn").addEventListener("click", () => decide("reject"));
+$("cancel-btn").addEventListener("click", async () => { if (current) await api(`/api/runs/${current.runId}/cancel`, { method: "POST", body: "{}" }).catch(() => {}); });
+
+(async () => {
+  await loadHealth();
+  try { scenarios = await api("/api/scenarios"); } catch { scenarios = []; }
+  selected = scenarios[0] ?? null;
+  renderScenarios();
+  $("run-btn").disabled = !selected;
+  loadHistory();
+})();

@@ -120,6 +120,20 @@ const handlers = {
     await loc.fill(String(value).slice(0, 64), { timeout: 5_000 });
     return { url: page.url() };
   },
+  // Called only by the control plane after an operator approved the exact cart (never reachable by the model).
+  // The token is single-use and bound to this run and cart; the store verifies it independently.
+  async submitApproved({ ref, epoch: e, token }) {
+    const loc = await elementFor(ref, e);
+    current = -1;
+    await loc.evaluate((el, t) => {
+      const input = el.form?.querySelector('input[name="approval"]');
+      if (!input) throw new Error("no approval field on this form");
+      input.value = t;
+    }, String(token));
+    await Promise.all([page.waitForLoadState("load").catch(() => {}), loc.click({ timeout: 5_000 })]);
+    await settle();
+    return { url: page.url() };
+  },
   async read({ selectors }) {
     const result = {};
     for (const [k, sel] of Object.entries(selectors)) {
