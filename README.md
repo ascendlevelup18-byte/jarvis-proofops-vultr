@@ -1,6 +1,42 @@
 # JARVIS ProofOps — Execute. Contain. Verify.
 
-**Status: pre-kickoff workspace (2 Nov 2026).** Entry being prepared for the Vultr: Agent Rush Hackathon 2026 (lablab.ai), Challenge 1 "Blast Radius Zero": a web agent that plans real browser work with Vultr Serverless Inference, runs it with Playwright inside an isolated sandbox on a Vultr VM, verifies the result with evidence, and visibly contains hostile pages. Nothing in this repository is the competition product yet; core competition functionality starts at the official kickoff.
+Entry for the Vultr: Agent Rush Hackathon 2026 (lablab.ai), Challenge 1 "Blast Radius Zero": a commerce QA agent that plans real browser work with Vultr Serverless Inference, runs it with Playwright inside a gVisor sandbox on a Vultr VM, and lets an independent verifier, not the model, decide what actually happened.
+
+**AI proposes. Policy authorizes. The browser acts inside a restricted boundary. Independent verification decides. Evidence proves it.**
+
+## Status (3 Nov 2026)
+| Tier | Status |
+|---|---|
+| Local, scripted planner, real Chromium (not isolated) | Working: `npm run proofops:release` passes every local gate |
+| Vultr VM with gVisor sandbox | Not yet run (VM exists; deployment waits on SSH host-key verification) |
+| Live Vultr Serverless Inference model | Not yet run (integration tested against a local mock only) |
+
+Local results are never presented as Vultr or live-model evidence. Every evidence bundle records its tier.
+
+## Run it locally
+Requires Node 24 and Chromium for Playwright (`cd apps/proofops/worker && npm ci && npx playwright install chromium`).
+```
+npm ci
+npm run proofops:demo      # operator console on http://127.0.0.1:4317 (scripted planner, no sandbox; labelled as such)
+npm run proofops:smoke     # runs all six missions against the running console and checks each outcome
+npm run proofops:release   # full local gate: typecheck, tests, smoke, evidence integrity, secret scan, deploy checks
+```
+Missions: correct discount (PASS), wrong discount (FAIL at $95 vs $90), hostile page (attempts blocked, no order),
+broken checkout (FAIL), approved checkout (one signed, single-use approval; replay refused), hung page (times out,
+worker destroyed). Evidence bundles land in `evidence-local/<run-id>/`; check one with
+`node apps/proofops/src/evidence.ts evidence-local/<run-id> <anchored-manifest-sha256>` (PASS, FAIL, INCOMPLETE or TAMPERED).
+
+## Architecture
+- `apps/proofops/src/server.ts`: control plane and operator API (holds the model key; the worker never does).
+- `model.ts`: planner. Vultr Serverless Inference through the OpenAI-compatible client, or a labelled scripted stub.
+- `policy.ts`: five typed actions, checked before anything reaches the browser.
+- `worker/worker.mjs`: disposable Playwright worker; stdin/stdout control; re-checks each element before acting.
+- `gateway.ts`: the worker's only way out; forwards to the run's storefront session only, from a fixed upstream.
+- `signer.ts`: separate process holding the only checkout-approval key.
+- `storefront.ts`: synthetic store; its checkout endpoint verifies approvals itself.
+- `verifier.ts`: judges frozen expectations against the page and the store's own records.
+- `evidence.ts`: per-run bundle with SHA-256 checksums; the manifest hash is anchored outside the bundle.
+- `ops/`: VM bootstrap (Docker, gVisor `runsc`), deploy, systemd, Caddy, and the gVisor boundary probe runbook.
 
 ## Prior work disclosed
 JARVIS ProofOps is a new commerce QA and secure browser-execution product developed for Vultr Agent Rush, built on selected reusable foundations from our earlier JARVIS engineering work. It is not a clean-room implementation, and it is not a renamed ACT III.

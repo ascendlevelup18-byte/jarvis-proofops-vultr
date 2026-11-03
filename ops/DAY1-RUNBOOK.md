@@ -98,3 +98,14 @@ Local runs with a stub model are labelled `LOCAL MODEL STUB` and never count tow
   - **Forced malicious tool proposal:** a harness injects the bad call to prove the policy denies it.
   - **Live-model prompt injection:** a hostile page is shown to the real model, and we record whether it actually proposed the bad action.
 - **No timing or isolation claims until measured.**
+
+## 9. Exact sequence once the host key is verified (current code)
+1. `ssh-keygen -lf` value from the Vultr console equals `SHA256:beVxH5zsv0QGKziyo2zTcRhGnqMfpjrNXUYZpsiaMbg`. Only then add the host to known_hosts.
+2. From the PC: `git bundle create proofops.bundle main`; `scp` it and `ops/vm-bootstrap.sh` to the VM.
+3. VM: `bash vm-bootstrap.sh`; then `git clone proofops.bundle /opt/proofops/app && chown -R proofops: /opt/proofops`.
+4. VM: `sudo -u proofops bash -c 'cd /opt/proofops/app && npm ci && (cd apps/proofops/worker && npm ci)'`; `docker build -t proofops-worker:1.64.1 apps/proofops/worker`.
+5. **gVisor gate:** `sudo -u proofops node apps/proofops/src/vm-boundary.ts --out /var/lib/proofops/vm-boundary.json`. All checks must pass (runtime observed by Docker as `runsc`, gVisor in the guest kernel log, network none, no host secrets, gateway refusals). On any failure, stop and keep the report.
+6. **Sandboxed missions, still with the scripted planner:** start `node apps/proofops/src/server.ts --sandbox --port 4317` and run `node apps/proofops/src/smoke.ts`. Tier recorded: `LIVE_VULTR_SANDBOX`, planner stub.
+7. Owner installs the inference key (`ops/set-inference-key.ps1`), after approving the subscription.
+8. `sudo -u proofops node ops/inference-smoke.mjs deepseek-v4.1-flash-1017`: one 16-token call; must return HTTP 200 and a response model.
+9. `ops/deploy-app.sh <sha> deepseek-v4.1-flash-1017 vultr:<instance-id> 45-63-82-115.sslip.io`, then run one live-model mission per scenario from the console.
