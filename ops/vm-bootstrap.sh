@@ -5,7 +5,15 @@
 set -euo pipefail
 
 [ "$(id -u)" -eq 0 ] || { echo "run as root"; exit 1; }
+. /etc/os-release
+[ "$ID" = ubuntu ] && [ "$VERSION_ID" = "24.04" ] || { echo "expected Ubuntu 24.04, found $PRETTY_NAME"; exit 1; }
+[ "$(dpkg --print-architecture)" = amd64 ] || { echo "expected amd64"; exit 1; }
 export DEBIAN_FRONTEND=noninteractive
+
+# SSH: key-only login. Vultr also sets a root password; it must never work over SSH.
+install -d /etc/ssh/sshd_config.d
+printf 'PasswordAuthentication no\nKbdInteractiveAuthentication no\nPermitRootLogin prohibit-password\n' > /etc/ssh/sshd_config.d/10-proofops.conf
+sshd -t && systemctl reload ssh
 
 apt-get update -y
 apt-get install -y ca-certificates curl gnupg ufw jq sqlite3
@@ -38,10 +46,13 @@ systemctl restart docker
 
 # Service users: the control plane, the approval signer and the verifier run as different users.
 for u in proofops proofops-approver proofops-verifier; do id "$u" >/dev/null 2>&1 || useradd --system --create-home --shell /usr/sbin/nologin "$u"; done
+# Known risk, disclosed in the README: docker group membership is root-equivalent on the host, so the control
+# plane is a high-value process. The worker never gets the Docker socket.
 usermod -aG docker proofops          # only the control plane may start workers
 install -d -m 750 -o proofops -g proofops /var/lib/proofops /etc/proofops
 
 # Firewall: SSH, HTTP and HTTPS only. Everything else inbound is dropped.
+# Docker-published ports bypass ufw, so ProofOps never uses `docker run -p`; services bind 127.0.0.1 behind Caddy.
 ufw default deny incoming
 ufw default allow outgoing
 ufw allow 22/tcp
@@ -51,7 +62,8 @@ ufw --force enable
 
 # Verification printout (evidence for the bootstrap step)
 echo "--- verification"
-. /etc/os-release && echo "os: $PRETTY_NAME"
+echo "os: $PRETTY_NAME"
+sshd -T 2>/dev/null | grep -E '^(passwordauthentication|permitrootlogin) '
 docker version --format 'docker: {{.Server.Version}}'
 docker info --format 'runtimes: {{range $k, $v := .Runtimes}}{{$k}} {{end}}'
 runsc --version | head -1
