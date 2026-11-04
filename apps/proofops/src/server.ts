@@ -177,7 +177,7 @@ async function readJson(req: IncomingMessage): Promise<Record<string, unknown>> 
 }
 // Mutating calls must come from this UI (same-origin fetch with a custom header), which blocks cross-site forms.
 const sameOrigin = (req: IncomingMessage) => req.headers["x-proofops"] === "1";
-const RUNS_PER_MINUTE = Math.min(Math.max(Number(process.env.PROOFOPS_RUNS_PER_MIN ?? "10") || 10, 1), 120);
+const RUNS_PER_MINUTE = Math.min(Math.max(Number(process.env.PROOFOPS_RUNS_PER_MIN ?? "30") || 30, 1), 120);
 const perIp = new Map<string, number[]>();
 // Behind Caddy every socket comes from 127.0.0.1, so the client address must come from the header Caddy sets.
 // Only honoured when configured: otherwise anyone could spoof the header to dodge the limit.

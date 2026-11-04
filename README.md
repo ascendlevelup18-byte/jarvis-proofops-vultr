@@ -28,12 +28,15 @@ worker destroyed). Evidence bundles land in `evidence-local/<run-id>/`; check on
 `node apps/proofops/src/evidence.ts evidence-local/<run-id> <anchored-manifest-sha256>` (PASS, FAIL, INCOMPLETE or TAMPERED).
 
 ## Deploy on a VM
-Needs Ubuntu 24.04 and SSH to a host key you verified yourself. As root on the VM, with the repository at `/opt/proofops/app`:
+Needs Ubuntu 24.04 and SSH to a host key you verified yourself. As root on the VM:
 ```
+git clone https://github.com/ascendlevelup18-byte/jarvis-proofops-vultr /opt/proofops/app
+cd /opt/proofops/app
 bash ops/vm-bootstrap.sh                                             # Docker, gVisor, Node 24, Caddy, firewall, service users
+chown -R proofops: /opt/proofops
 bash ops/deploy-app.sh <git-ref> stub <deployment-label> <hostname>  # builds the worker image, starts proofops and Caddy
 ```
-A model id in place of `stub` runs the live planner and needs the inference key installed first with `ops/set-inference-key.ps1`, which reads it from a hidden prompt. The service refuses to start if the key, `runsc` or the worker image is missing. [ops/DAY1-RUNBOOK.md](ops/DAY1-RUNBOOK.md) has the full sequence, including the gVisor boundary probe.
+A model id in place of `stub` runs the live planner and needs the inference key installed first with `ops/set-inference-key.ps1`, which reads it from a hidden prompt. The service refuses to start if the key, `runsc` or the worker image is missing. [ops/DAY1-RUNBOOK.md](ops/DAY1-RUNBOOK.md) has the full sequence, including the gVisor boundary probe. [ops/RECOVERY.md](ops/RECOVERY.md) covers failures, the operator commands, the labelled scripted fallback and rollback.
 
 ## Architecture
 - `apps/proofops/src/server.ts`: control plane and operator API (holds the model key; the worker never does).

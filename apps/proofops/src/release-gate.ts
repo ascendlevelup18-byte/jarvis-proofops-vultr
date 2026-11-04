@@ -43,7 +43,7 @@ record("local Chromium + forced-attack e2e", "LOCAL_CHROMIUM/LOCAL_FORCED_ATTACK
 const work = mkdtempSync(join(tmpdir(), "proofops-gate-"));
 const port = await new Promise<number>((r) => { const s = createServer().listen(0, "127.0.0.1", () => { const p = (s.address() as { port: number }).port; s.close(() => r(p)); }); });
 const server = spawn(node, ["apps/proofops/src/server.ts", "--port", String(port), "--evidence", join(work, "evidence"), "--data", join(work, "data")],
-  { cwd: ROOT, env: { ...process.env, PROOFOPS_RUNS_PER_MIN: "60" }, stdio: "ignore" });
+  { cwd: ROOT, env: { ...process.env }, stdio: "ignore" });
 try {
   for (let i = 0; i < 40; i++) { try { if ((await fetch(`http://127.0.0.1:${port}/api/health`)).ok) break; } catch { /* starting */ } await new Promise((r) => setTimeout(r, 250)); }
   record("smoke: 6 missions as designed", "LOCAL_SCRIPTED", () => {
