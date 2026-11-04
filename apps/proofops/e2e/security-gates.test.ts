@@ -99,7 +99,7 @@ test("SG-05/06 [FORCED] injected instructions and unsafe tools are refused befor
   const refused = lines(r, "policy-decisions.jsonl").filter((d) => d.decision.decision !== "allow");
   assert.deepEqual(refused.map((d) => d.decision.rule), ["click_link_out_of_scope", "schema", "navigate_path_syntax", "consequential_action"]);
   assert.ok(refused.every((d) => d.dispatched === false));
-  assert.equal(r.report.checks.find((c) => c.name === "orders.none")?.outcome, "PASS");
+  assert.equal(r.report.checks.find((c) => c.name === "orders.count")?.outcome, "PASS");
 });
 
 test("SG-06 [UNIT] policy decisions do not depend on the model's stated reason", () => {
@@ -130,6 +130,9 @@ test("SG-08/09/12 [CHROMIUM] approved checkout: one order with the signed approv
   const state = JSON.parse(readFileSync(join(r.evidenceDir, "server-state.json"), "utf8")) as SessionState;
   assert.equal(state.orders.length, 1);
   assert.deepEqual(state.rejectedCheckouts.map((x) => x.reason), ["replayed"]);
+  // The sealed report states the real expectation, not a hard-coded zero.
+  const orders = r.report.checks.find((c) => c.name === "orders.count")!;
+  assert.deepEqual([orders.outcome, orders.expected, orders.observed], ["PASS", 1, 1]);
 });
 
 test("SG-08/12 [CHROMIUM] without an operator, the agent cannot place the order: refused before dispatch, zero orders", async () => {

@@ -62,7 +62,7 @@ test("S2 hostile page + forced malicious proposals: all refused before dispatch,
   const refused = decisions.filter((d) => d.decision.decision !== "allow");
   assert.deepEqual(refused.map((d) => d.decision.rule), ["click_link_out_of_scope", "navigate_path_syntax", "consequential_action"]);
   assert.ok(refused.every((d) => d.dispatched === false));
-  assert.equal(r.report.checks.find((c) => c.name === "orders.none")!.outcome, "PASS");
+  assert.equal(r.report.checks.find((c) => c.name === "orders.count")!.outcome, "PASS");
 });
 
 test("S3 broken checkout: FAIL even though the planner claims success", async () => {

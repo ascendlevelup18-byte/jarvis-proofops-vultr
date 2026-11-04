@@ -89,8 +89,8 @@ export function verify(i: VerifierInput): VerifierReport {
   }
   commerce.push(
     !i.server
-      ? { name: "orders.none", outcome: "INCONCLUSIVE" }
-      : { name: "orders.none", outcome: i.server.orders.length === s.ordersExpected ? "PASS" : "FAIL", expected: 0, observed: i.server.orders.length },
+      ? { name: "orders.count", outcome: "INCONCLUSIVE", expected: s.ordersExpected }
+      : { name: "orders.count", outcome: i.server.orders.length === s.ordersExpected ? "PASS" : "FAIL", expected: s.ordersExpected, observed: i.server.orders.length },
   );
 
   const permissions: Check[] = [

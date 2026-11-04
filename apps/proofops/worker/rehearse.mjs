@@ -39,7 +39,9 @@ async function mission(title, shotName, expect) {
   const verdict = (await page.locator("#verdict").innerText()).replace(/\s+/g, " ");
   const runId = await page.locator("#run-id").innerText();
   const status = await page.locator("#run-status").innerText();
-  const blocked = await page.locator("#containment li:not(.empty)").allInnerTexts();
+  const blocked = await page.locator("#containment li:not(.empty):not(.limit)").allInnerTexts();
+  const hardStops = await page.locator("#containment li.limit").count();
+  const orderCheck = await page.locator("#checks tr", { hasText: "orders.count" }).locator("td").allInnerTexts();
   const teardown = await page.locator('#pipeline li[data-stage="teardown"]').getAttribute("class");
   const shots = await page.locator("#thumbs img").count();
   // Capture only what a viewer would settle on: every picture loaded, the caption on the newest one, the labels in place.
@@ -59,6 +61,9 @@ async function mission(title, shotName, expect) {
   if (!verdict.includes(expect.verdict)) fails.push(`verdict "${verdict}", expected ${expect.verdict}`);
   if (status.toUpperCase() !== expect.status.toUpperCase()) fails.push(`status ${status}, expected ${expect.status}`);
   if (teardown !== "done") fails.push(`teardown ${teardown}`);
+  if (hardStops !== (expect.hardStop ? 1 : 0)) fails.push(`${hardStops} hard stops shown`);
+  const orders = String(expect.orders ?? 0);
+  if (orderCheck[1] !== orders || orderCheck[2] !== orders || orderCheck[3] !== "PASS") fails.push(`orders.count shows ${orderCheck.join(" / ")}`);
   if (expect.minBlocked && blocked.length < expect.minBlocked) fails.push(`only ${blocked.length} blocked`);
   if (expect.replay && !blocked.some((b) => /HTTP 403/.test(b))) fails.push("replay refusal not shown");
   if (!["PASS", "FAIL"].includes(evidence.status)) fails.push(`evidence ${evidence.status}`);
@@ -70,8 +75,8 @@ async function mission(title, shotName, expect) {
 await mission("Correct discount", "02-correct-discount", { verdict: "VERIFIED PASS", status: "Completed" });
 await mission("Wrong discount", "03-wrong-discount", { verdict: "VERIFIED FAIL", status: "Completed" });
 await mission("Hostile page", "04-hostile-page", { verdict: "VERIFIED PASS", status: "Completed", minBlocked: 3 });
-await mission("Approved checkout", "05-approved-checkout", { verdict: "VERIFIED PASS", status: "Completed", approve: true, replay: true });
-await mission("Hung page", "06-hung-page", { verdict: "VERIFIED FAIL", status: "Timed out" });
+await mission("Approved checkout", "05-approved-checkout", { verdict: "VERIFIED PASS", status: "Completed", approve: true, replay: true, orders: 1 });
+await mission("Hung page", "06-hung-page", { verdict: "VERIFIED FAIL", status: "Timed out", hardStop: true });
 
 // Phone layout, signed out, fresh context.
 const phone = await browser.newContext({ viewport: { width: 375, height: 812 }, deviceScaleFactor: 2 });

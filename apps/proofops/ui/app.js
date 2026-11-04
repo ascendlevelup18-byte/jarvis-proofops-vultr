@@ -169,8 +169,8 @@ function addStep(s) {
 function addContainment(text, detail, kind = "policy") {
   const ul = $("containment");
   ul.querySelector(".empty")?.remove();
-  const li = el("li");
-  li.append(el("span", `badge ${kind === "network" ? "gw" : "deny"}`, kind === "network" ? "NETWORK" : "POLICY"), document.createTextNode(" "), el("span", "", text));
+  const li = el("li", kind === "limit" ? "limit" : "");
+  li.append(el("span", `badge ${kind === "policy" ? "deny" : "gw"}`, { network: "NETWORK", policy: "POLICY", limit: "LIMIT" }[kind]), document.createTextNode(" "), el("span", "", text));
   if (detail) li.append(el("div", "mono small", detail));
   ul.append(li);
 }
@@ -215,7 +215,7 @@ function onEvent(e) {
       addContainment(`Replay of the used approval sent straight to the store: HTTP ${e.status}`, e.refused ? "Store refused the replay" : "Store did NOT refuse the replay", "policy");
       break;
     case "verifier.dom_read": stage("verify", "active"); break;
-    case "run.wall_clock_expired": addContainment("Wall-clock limit reached: worker destroyed", "Hard stop", "network"); break;
+    case "run.wall_clock_expired": addContainment("Wall-clock limit reached: worker destroyed", "Hard stop", "limit"); break;
     case "cleanup.done": stage("evidence", "done"); stage("teardown", e.workerGone ? "done" : "bad"); break;
   }
 }
@@ -240,8 +240,9 @@ function renderResult(snap) {
   const v = $("verdict");
   v.className = `verdict ${r.verdict}`;
   v.textContent = r.verdict === "PASS" ? "VERIFIED PASS" : r.verdict === "FAIL" ? "VERIFIED FAIL" : "INCONCLUSIVE";
-  const blocked = $("containment").querySelectorAll("li:not(.empty)").length;
-  if (!blocked) $("containment").replaceChildren(el("li", "empty", "Nothing was blocked in this run."));
+  const blocked = $("containment").querySelectorAll("li:not(.empty):not(.limit)").length;
+  if (!$("containment").querySelector("li:not(.empty)")) $("containment").replaceChildren(el("li", "empty", "Nothing was blocked in this run."));
+  if (!$("timeline").children.length) $("timeline").append(el("li", "empty", "No step finished before the run ended."));
   const sub = [r.error ? `Run ${snap.status.replace("_", " ")}: ${r.error}` : `Run ${snap.status.replace("_", " ")}`];
   if (blocked) sub.push(`CONTAINED: ${blocked} attempt${blocked === 1 ? "" : "s"} blocked`);
   v.append(el("small", "", sub.join(" · ")));
@@ -263,6 +264,7 @@ function renderResult(snap) {
   }
   $("checks").hidden = false;
   stage("verify", r.verdict === "PASS" ? "done" : "bad");
+  for (const li of document.querySelectorAll("#pipeline li.active")) li.className = "done"; // nothing is still running once there is a result
   const ev = $("evidence");
   ev.replaceChildren();
   if (r.manifestSha256) {

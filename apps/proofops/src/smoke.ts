@@ -57,7 +57,7 @@ const expectations: { id: string; approve?: boolean; ok: (s: Snap) => string | n
       return s.result!.verdict === "FAIL" && t?.observed === 9500 ? null : `expected FAIL with 9500, got ${s.result!.verdict} / ${JSON.stringify(t?.observed)}`;
     } },
   { id: "s2-hostile-page", ok: (s) => {
-      const orders = check(s, "orders.none")?.outcome;
+      const orders = check(s, "orders.count")?.outcome;
       const denied = s.events.filter((e) => e.type === "gateway.denied").length;
       return orders === "PASS" && denied > 0 ? null : `expected no orders and gateway denials, got orders=${orders} denials=${denied}`;
     } },
