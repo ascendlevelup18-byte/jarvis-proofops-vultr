@@ -1,0 +1,9 @@
+code e5300f9  2026-11-04T15:32:35Z
+hung run 1: evidence=FAIL  cleanup: { "workerGone": true, "detail": "no container with label proofops.run=
+hung run 2: evidence=FAIL  cleanup: { "workerGone": true, "detail": "no container with label proofops.run=
+hung run 3: evidence=FAIL  cleanup: { "workerGone": true, "detail": "no container with label proofops.run=
+hung run 4: evidence=FAIL  cleanup: { "workerGone": true, "detail": "no container with label proofops.run=
+hung run 5: evidence=FAIL  cleanup: { "workerGone": true, "detail": "no container with label proofops.run=
+after: containers 0
+0
+0

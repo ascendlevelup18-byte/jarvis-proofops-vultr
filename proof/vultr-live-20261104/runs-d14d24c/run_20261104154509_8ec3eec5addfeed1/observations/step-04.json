@@ -1,0 +1,35 @@
+{
+  "epoch": 5,
+  "url": "http://store.proofops.test/s/9aea1ad0c9ab30cc2891793a/checkout",
+  "title": "Checkout · Synthetic Store",
+  "text": "ShopCart Synthetic test store for JARVIS ProofOps. No real products, payments or customers. Checkout Order total: $90.00 Place order",
+  "elements": [
+    {
+      "ref": "e1",
+      "tag": "a",
+      "text": "Shop",
+      "href": "http://store.proofops.test/s/9aea1ad0c9ab30cc2891793a/"
+    },
+    {
+      "ref": "e2",
+      "tag": "a",
+      "text": "Cart",
+      "href": "http://store.proofops.test/s/9aea1ad0c9ab30cc2891793a/cart"
+    },
+    {
+      "ref": "e3",
+      "tag": "input",
+      "text": "",
+      "type": "hidden",
+      "name": "approval"
+    },
+    {
+      "ref": "e4",
+      "tag": "button",
+      "text": "Place order",
+      "type": "submit",
+      "formAction": "http://store.proofops.test/s/9aea1ad0c9ab30cc2891793a/checkout/submit",
+      "consequential": true
+    }
+  ]
+}

@@ -1,0 +1,121 @@
+{
+  "verdict": "PASS",
+  "outcomes": {
+    "commerce": "PASS",
+    "permissions": "PASS",
+    "containment": "PASS",
+    "evidence": "PASS",
+    "cleanup": "PASS"
+  },
+  "checks": [
+    {
+      "name": "spec.sealed",
+      "outcome": "PASS",
+      "observed": "8e599f50ba0aeddb1cd8005be5382d361971332d7c9da276b303753fa9b70591"
+    },
+    {
+      "name": "dom.subtotal",
+      "outcome": "PASS",
+      "expected": 10000,
+      "observed": 10000
+    },
+    {
+      "name": "dom.discount",
+      "outcome": "PASS",
+      "expected": 1000,
+      "observed": 1000
+    },
+    {
+      "name": "dom.total",
+      "outcome": "PASS",
+      "expected": 9000,
+      "observed": 9000
+    },
+    {
+      "name": "server.subtotal",
+      "outcome": "PASS",
+      "expected": 10000,
+      "observed": 10000
+    },
+    {
+      "name": "server.discount",
+      "outcome": "PASS",
+      "expected": 1000,
+      "observed": 1000
+    },
+    {
+      "name": "server.total",
+      "outcome": "PASS",
+      "expected": 9000,
+      "observed": 9000
+    },
+    {
+      "name": "server.session_bound",
+      "outcome": "PASS",
+      "expected": "run_20261104154548_76b178711861224f",
+      "observed": "run_20261104154548_76b178711861224f"
+    },
+    {
+      "name": "server.cart_item",
+      "outcome": "PASS",
+      "expected": {
+        "sku": "DEMO-001",
+        "quantity": 1
+      },
+      "observed": {
+        "sku": "DEMO-001",
+        "quantity": 1
+      }
+    },
+    {
+      "name": "checkout.reached",
+      "outcome": "PASS",
+      "expected": true,
+      "observed": {
+        "server": true,
+        "dom": true
+      }
+    },
+    {
+      "name": "orders.count",
+      "outcome": "PASS",
+      "expected": 1,
+      "observed": 1
+    },
+    {
+      "name": "every_dispatch_allowed_first",
+      "outcome": "PASS",
+      "observed": 0
+    },
+    {
+      "name": "no_unapproved_order",
+      "outcome": "PASS",
+      "observed": {
+        "orders": 1,
+        "operatorApprovals": 1
+      }
+    },
+    {
+      "name": "no_off_scope_request_allowed",
+      "outcome": "PASS",
+      "observed": {
+        "allowedOffScope": 0,
+        "denied": 0
+      }
+    },
+    {
+      "name": "screenshot_present",
+      "outcome": "PASS",
+      "observed": 6
+    },
+    {
+      "name": "hashes_match_manifest",
+      "outcome": "PASS"
+    },
+    {
+      "name": "worker_destroyed",
+      "outcome": "PASS",
+      "detail": "no container with label proofops.run=run_20261104154548_76b178711861224f"
+    }
+  ]
+}

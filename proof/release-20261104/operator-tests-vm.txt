@@ -1,0 +1,62 @@
+(First pass. The copy of the fixed script had failed, so this ran on d949186, where the live command had a bug. It left the public demo on the scripted planner for about 90 seconds, 15:16:30 to 15:17:55 UTC, and a restart ended one visitor mission started at 15:16:23. The second pass below is on the fixed script.)
+
+start 2026-11-04T15:16:23Z
+tier=VULTR_GVISOR_LIVE_MODEL code=8a80cf01f31c active="run_20261104151623_5455d197f4bf0bbc" recovered=0
+
+=== live: deploys this commit
+The key was not accepted, so the demo stays as it is.
+tier=VULTR_GVISOR_LIVE_MODEL code=8a80cf01f31c active="run_20261104151623_5455d197f4bf0bbc" recovered=0
+
+=== scripted without --confirm: must refuse
+This changes the public demo to the SCRIPTED planner, with no live AI. To go ahead: operator.sh scripted --confirm
+exit 2
+tier=VULTR_GVISOR_LIVE_MODEL code=8a80cf01f31c active="run_20261104151623_5455d197f4bf0bbc" recovered=0
+
+=== scripted --confirm: labelled fallback
+PUBLIC DEMO IS NOW SCRIPTED. The header reads "Model: scripted planner (no live AI)" and runs are labelled VULTR_GVISOR_SCRIPTED.
+Do not present these runs as live-model evidence. To go back: operator.sh live
+tier=VULTR_GVISOR_SCRIPTED code=d94918677ef0 active=null recovered=1
+"planner":{"provider":"local-model-stub"}
+
+=== live: back to the model
+The key was not accepted, so the demo stays as it is.
+tier=VULTR_GVISOR_SCRIPTED code=d94918677ef0 active=null recovered=1
+
+=== rollback to the previous commit, keeping live mode
+active
+tier=VULTR_GVISOR_SCRIPTED code=d94918677ef0 active=null recovered=0
+d949186 ops: operator recovery commands and failure-recovery guide; rehearsal also capture
+
+=== and forward again
+active
+tier=VULTR_GVISOR_SCRIPTED code=d94918677ef0 active=null recovered=0
+
+=== set-daily-limit, same value, then removed so the unit stays as tested
+Daily mission cap is now 150. Worst case about $5.40 a day at the planned model's prices.
+tier=VULTR_GVISOR_SCRIPTED code=d94918677ef0 active=null recovered=0
+
+=== clear-workers with nothing to clear
+no leftover workers
+
+=== Caddy restart during a mission: the mission must carry on (one model call)
+tier=VULTR_GVISOR_SCRIPTED code=d94918677ef0 active="run_20261104151649_2129310ae90b842a" recovered=0
+clear-workers while it runs:
+A mission is running. Cancel it or wait; nothing was removed.
+caddy restarted: active
+public site through Caddy: HTTP 200
+tier=VULTR_GVISOR_SCRIPTED code=d94918677ef0 active=null recovered=0
+mission status=timed_out verdict=FAIL
+
+{ "workerGone": true, "detail": "no container with label proofops.run=run_20261104151649_2129310ae90b842a", "socketRemoved": true }
+
+
+=== status
+commit:   d94918677ef0b5bad377d8bace4850403dacb3ce
+planner:  stub 
+health:   {"ok":true,"service":"jarvis-proofops","tier":"VULTR_GVISOR_SCRIPTED","planner":{"provider":"local-model-stub"},"isolation":"gvisor-runsc","codeSha":"d94918677e
+services: proofops=active caddy=active docker=active
+workers:  0 containers, 0 socket folders
+key file: proofops mode 600
+missions: 70 in the last 24 hours, cap 150
+disk:     19G 143G 12%
+end 2026-11-04T15:17:21Z

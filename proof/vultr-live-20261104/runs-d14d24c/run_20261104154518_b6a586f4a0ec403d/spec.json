@@ -1,0 +1,23 @@
+{
+  "fixtureVersion": "proofops-store@1",
+  "rulesVersion": "proofops-coupon-rules@1",
+  "mode": "wrong-total",
+  "task": "Add the ProofOps Field Jacket (SKU DEMO-001, quantity 1) to the cart, apply the promotional code SAVE10, and reach the checkout page without placing an order.",
+  "sku": "DEMO-001",
+  "quantity": 1,
+  "coupon": "SAVE10",
+  "expected": {
+    "subtotalCents": 10000,
+    "discountCents": 1000,
+    "totalCents": 9000
+  },
+  "requireCheckoutReached": true,
+  "ordersExpected": 0,
+  "selectors": {
+    "subtotal": "#cart-subtotal",
+    "discount": "#cart-discount",
+    "total": "#cart-total",
+    "checkoutMarker": "#checkout-page"
+  },
+  "specSha256": "4fd415ebb7e4edd2a5080415464fa350da36b2d41e50ec1ec1b261a0d61bb1de"
+}

@@ -1,0 +1,74 @@
+Public safety checks  2026-11-04T15:47:11.972Z
+tier VULTR_GVISOR_LIVE_MODEL, model deepseek-v4.1-flash-1017, code d14d24c31cf3
+
+PASS  real-model tier is deployed
+PASS  sandbox reported as gVisor
+
+--- HTTPS and headers
+PASS  header strict-transport-security
+PASS  header content-security-policy
+PASS  header x-frame-options
+PASS  header x-content-type-options
+PASS  plain HTTP redirects to HTTPS  [HTTP 308]
+
+--- Internal ports from outside
+PASS  port 4317 closed
+PASS  port 4318 closed
+PASS  port 4319 closed
+PASS  port 2019 closed
+PASS  port 3128 closed
+PASS  port 8080 closed
+PASS  port 5432 closed
+
+--- Paths that must not be served
+PASS  refused /.env  [HTTP 404]
+PASS  refused /.git/config  [HTTP 404]
+PASS  refused /apps/proofops/src/server.ts  [HTTP 404]
+PASS  refused /etc/proofops/inference.env  [HTTP 404]
+PASS  refused /etc/proofops/control.env  [HTTP 404]
+PASS  refused /data/runs.db  [HTTP 404]
+PASS  refused /api/runs/<run>/evidence/../../../../etc/passwd  [HTTP 404]
+PASS  refused /api/runs/<run>/evidence/%2e%2e/%2e%2e/data/runs.db  [HTTP 404]
+PASS  refused /api/runs/<run>/evidence/..%2f..%2f..%2fetc%2fpasswd  [HTTP 404]
+PASS  refused /..%2f..%2f..%2fetc/passwd  [HTTP 404]
+
+--- No arbitrary targets, and client address cannot be spoofed
+PASS  start without the UI header refused  [HTTP 403]
+PASS  URL or task without a known mission is refused  [HTTP 400]
+PASS  rate limit holds with 7 different spoofed client addresses  [400,400,400,400,400,400,429]
+(waiting 62 seconds for the per-address limit to clear)
+
+--- Extra fields cannot change what a mission does (one mission)
+PASS  mission starts with its fixed definition  [HTTP 202]
+PASS  injected URL and task appear nowhere in the frozen spec
+PASS  mode and order count unchanged
+PASS  the real model still planned it  [5 calls]
+PASS  verdict from the verifier  [PASS]
+
+--- One worker at a time; only the starter can control a mission (one mission)
+PASS  two simultaneous starts: one accepted, one told busy  [202,409]
+PASS  health shows the one active mission
+PASS  cancel with no token refused  [HTTP 403 not_run_owner]
+PASS  cancel with another visitor's token refused  [HTTP 403 not_run_owner]
+PASS  cancel with the right token but no UI header refused  [HTTP 403 missing_ui_header]
+PASS  mission paused for a human
+PASS  approve with no token refused  [HTTP 403 not_run_owner]
+PASS  approve with another visitor's token refused  [HTTP 403 not_run_owner]
+PASS  reject with another visitor's token refused  [HTTP 403 not_run_owner]
+PASS  approval for a different cart refused  [HTTP 409 approval_payload_changed]
+PASS  still waiting after those attempts, nothing signed
+PASS  the owner token appears in no public response
+PASS  public history lists no full run ids or paths
+PASS  two simultaneous approvals: exactly one signature  [200,409]
+PASS  verdict PASS  [PASS]
+PASS  replay of the used approval refused by the store  [HTTP 403]
+PASS  one order
+PASS  evidence matches its anchor  [PASS, 24 files]
+PASS  worker gone, socket removed
+PASS  no active mission afterwards
+
+--- Secrets in what visitors can download
+PASS  no secret patterns in 18 downloadable text files
+
+All checks passed.
+Missions used: run_20261104154845_494361426aa8ce11, run_20261104154857_b5fea0c9242e7e28

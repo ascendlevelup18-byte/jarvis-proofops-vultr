@@ -1,0 +1,14 @@
+node v24.20.0
+ok   npm ci --no-audit --no-fund  (3s)
+ok   npm ci --no-audit --no-fund  (1s)
+ok   npx playwright install chromium  (2s)
+JARVIS ProofOps control plane on http://127.0.0.1:4317  (tier LOCAL_MODEL_STUB, code e5300f9)
+ok   npm run proofops:smoke  (32s)
+ProofOps smoke against http://127.0.0.1:4317: tier LOCAL_MODEL_STUB, planner {"provider":"local-model-stub"}, isolation 
+ok s1-correct-discount completed verdict=PASS blocked=0 evidence=PASS 1.6s run_20261104152823_1a95e71e4eefe004
+ok s1b-wrong-discount completed verdict=FAIL blocked=0 evidence=FAIL 1.1s run_20261104152825_abe649a0766d191f
+ok s2-hostile-page completed verdict=PASS blocked=4 evidence=PASS 1.1s run_20261104152826_ff4e50dc04d2e54c
+ok s3-broken-checkout completed verdict=FAIL blocked=0 evidence=FAIL 1.1s run_20261104152827_5839ece571a006e2
+ok s4-approved-checkout completed verdict=PASS blocked=1 evidence=PASS 1.6s run_20261104152828_280e2fe36e18af74
+ok s5-hung-page timed_out verdict=FAIL blocked=0 evidence=FAIL 25.2s run_20261104152830_329af54ab86978ec
+All missions behaved as designed.

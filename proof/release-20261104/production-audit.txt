@@ -1,0 +1,96 @@
+Production audit  2026-11-04T15:53:14Z
+
+=== Deployed code
+d14d24c31cf396efa0eec1e87f8d8107a521a349
+uncommitted changes on the VM: 0
+
+=== Operator status
+commit:   d14d24c31cf396efa0eec1e87f8d8107a521a349
+planner:  vultr deepseek-v4.1-flash-1017
+health:   {"ok":true,"service":"jarvis-proofops","tier":"VULTR_GVISOR_LIVE_MODEL","planner":{"provider":"vultr-serverless-inference","model":"deepseek-v4.1-flash-1017"},"isolation":"gvisor-runsc","codeSha":"d14d24c31cf3","active":null,"recoveredOnStart":0}
+services: proofops=active caddy=active docker=active
+workers:  0 containers, 0 socket folders
+key file: proofops mode 600
+missions: 91 in the last 24 hours, cap 150
+disk:     19G 143G 12%
+Vultr health route answered HTTP 200
+
+=== Process
+NRestarts=0 User=proofops ActiveState=active 
+/usr/local/bin/node apps/proofops/src/server.ts --sandbox --port 4317 --deployment vultr:sjc:45.63.82.115 --evidence /var/lib/proofops/evidence --data /var/lib/proofops/data 
+environment names and limits (values shown only for non-secret settings):
+PROOFOPS_DEPLOYMENT=vultr:sjc:45.63.82.115
+PROOFOPS_EVIDENCE_KEEP=300
+PROOFOPS_HOST=127.0.0.1
+PROOFOPS_INFERENCE_ENV_FILE=/etc/proofops/inference.env
+PROOFOPS_MAX_RUNS_PER_DAY=150
+PROOFOPS_MODEL=deepseek-v4.1-flash-1017
+PROOFOPS_PLANNER=vultr
+PROOFOPS_RUNS_PER_MIN=6
+PROOFOPS_TRUST_PROXY=1
+secret-named variables in the service's environment: 0
+
+=== Files holding configuration
+/etc/proofops/control.env  root:proofops mode 640  106 bytes
+/etc/proofops/inference.env  proofops:proofops mode 600  64 bytes
+PROOFOPS_PLANNER=vultr
+PROOFOPS_MODEL=deepseek-v4.1-flash-1017
+PROOFOPS_DEPLOYMENT=vultr:sjc:45.63.82.115
+
+=== Listeners (internal services on 127.0.0.1 only)
+0.0.0.0:22
+127.0.0.1:2019
+127.0.0.1:33357
+127.0.0.1:36849
+127.0.0.1:4317
+127.0.0.53%lo:53
+127.0.0.54:53
+[::]:22
+*:443
+*:80
+
+=== Firewall
+Status: active
+Logging: on (low)
+Default: deny (incoming), allow (outgoing), deny (routed)
+22/tcp                     ALLOW       Anywhere                  
+80/tcp                     ALLOW       Anywhere                  
+443/tcp                    ALLOW       Anywhere                  
+22/tcp (v6)                ALLOW       Anywhere (v6)             
+80/tcp (v6)                ALLOW       Anywhere (v6)             
+443/tcp (v6)               ALLOW       Anywhere (v6)             
+
+
+=== Caddy
+{$PROOFOPS_HOSTNAME} {
+	encode gzip
+	reverse_proxy 127.0.0.1:4317 {
+		flush_interval -1
+	}
+	header Strict-Transport-Security "max-age=31536000"
+}
+Caddy sets X-Forwarded-For itself and trusts no proxy unless told to; trusted_proxies configured: 0
+Caddy admin from the VM itself: HTTP 200 (bound to 127.0.0.1)
+
+=== Docker
+default runtime runc
+"runsc":{"path":"/usr/bin/runsc"
+worker image sha256:c1df7ced2a6ce88664ab51575fab9efb0a93f0d5580cc9e1a8526fc90e4a0fe9 3636839593 bytes
+runsc version release-20261102.0
+running containers: 0; leftover workers: 0; socket folders: 0
+
+=== Boot
+enabled enabled enabled 
+2026-11-04 15:19:22
+6.8.0-147-generic
+
+=== Failed units: 0
+
+=== Key scan (counts only)
+evidence files: 0
+registry files: 0
+service and proxy journal lines: 0
+git history and tree on the VM: 0
+
+=== Recorded token use, all live-model bundles on the VM
+{"liveRuns":34,"modelCalls":156,"failedCalls":0,"promptTokens":113103,"completionTokens":8621,"totalTokens":121724,"usdAtCatalogPrices":0.02214}

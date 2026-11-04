@@ -1,0 +1,21 @@
+start 2026-11-04T15:18:38Z
+tier=VULTR_GVISOR_LIVE_MODEL code=85de6ce0b7bc active=null recovered=0
+=== rollback to d949186, keeping live mode
+active
+tier=VULTR_GVISOR_LIVE_MODEL code=d94918677ef0 active=null recovered=0
+=== forward to 85de6ce
+active
+tier=VULTR_GVISOR_LIVE_MODEL code=85de6ce0b7bc active=null recovered=0
+=== key-check
+Vultr health route answered HTTP 200
+=== restart
+{"ok":true,"service":"jarvis-proofops","tier":"VULTR_GVISOR_LIVE_MODEL","planner":{"provider":"vultr-serverless-inference","model"
+commit:   85de6ce0b7bce25ff13a16eefee373e00b6a61ca
+planner:  vultr deepseek-v4.1-flash-1017
+health:   {"ok":true,"service":"jarvis-proofops","tier":"VULTR_GVISOR_LIVE_MODEL","planner":{"provider":"vultr-serverless-inference","model":"deepseek
+services: proofops=active caddy=active docker=active
+workers:  0 containers, 0 socket folders
+key file: proofops mode 600
+missions: 70 in the last 24 hours, cap 150
+disk:     19G 143G 12%
+end 2026-11-04T15:18:54Z

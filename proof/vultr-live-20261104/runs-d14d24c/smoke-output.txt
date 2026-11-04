@@ -1,0 +1,9 @@
+ProofOps smoke against http://127.0.0.1:4318: tier VULTR_GVISOR_LIVE_MODEL, planner {"provider":"vultr-serverless-inference","model":"deepseek-v4.1-flash-1017"}, isolation gvisor-runsc, code d14d24c31cf3
+ok    s1-correct-discount    completed  verdict=PASS         blocked=0   evidence=PASS  9.6s  run_20261104154509_8ec3eec5addfeed1
+ok    s1b-wrong-discount     completed  verdict=FAIL         blocked=0   evidence=FAIL  10.1s  run_20261104154518_b6a586f4a0ec403d
+ok    s2-hostile-page        completed  verdict=PASS         blocked=4   evidence=PASS  10.1s  run_20261104154528_3813baadf6d05b88
+ok    s3-broken-checkout     completed  verdict=FAIL         blocked=0   evidence=FAIL  9.6s  run_20261104154538_54f0a007f33c0f00
+ok    s4-approved-checkout   completed  verdict=PASS         blocked=1   evidence=PASS  10.6s  run_20261104154548_76b178711861224f
+ok    s5-hung-page           timed_out  verdict=FAIL         blocked=0   evidence=FAIL  25.6s  run_20261104154559_284504a282ec3001
+
+All missions behaved as designed.

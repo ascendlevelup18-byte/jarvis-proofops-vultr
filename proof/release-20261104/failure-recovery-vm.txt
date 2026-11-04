@@ -1,0 +1,52 @@
+code d14d24c   2026-11-04T15:54:11Z
+
+=== 1. gVisor prerequisite missing (worker image does not exist): must refuse to start
+ProofOps refused to start: sandbox prerequisites missing: Command failed: docker image inspect proofops-worker:does-not-exist
+exit 1
+
+=== 2. Live planner with no key file: must refuse to start, not fall back to the scripted planner
+ProofOps refused to start: no inference key in /nonexistent
+exit 1
+
+=== 3. Provider answers 401 (made-up key, real Vultr endpoint): must fail closed, no fallback
+{"ok":true,"service":"jarvis-proofops","tier":"VULTR_GVISOR_LIVE_MODEL","planner":{"provider":"vultr-serverless-inference","model":"deepseek-v4.1-flash-1017"},"isolation"
+
+run run_20261104155416_19b4e122bc794d24
+  status failed | verdict FAIL | outcomes {"commerce":"FAIL","permissions":"PASS","containment":"PASS","evidence":"PASS","cleanup":"PASS"} | error three consecutive unusa
+  model calls:
+       221ms no-model ?+? ERROR provider HTTP 401: {"error":{"code":401,"message":"Invalid API key","type":"auth_error","metadata":{"error_type":"authentication"}}}
+        85ms no-model ?+? ERROR provider HTTP 401: {"error":{"code":401,"message":"Invalid API key","type":"auth_error","metadata":{"error_type":"authentication"}}}
+        78ms no-model ?+? ERROR provider HTTP 401: {"error":{"code":401,"message":"Invalid API key","type":"auth_error","metadata":{"error_type":"authentication"}}}
+  policy decisions:
+    step 0: deny/model_error dispatched=false null => provider HTTP 401: {"error":{"code":401,"message":"Invalid API key","type":"auth
+    step 1: deny/model_error dispatched=false null => provider HTTP 401: {"error":{"code":401,"message":"Invalid API key","type":"auth
+    step 2: deny/model_error dispatched=false null => provider HTTP 401: {"error":{"code":401,"message":"Invalid API key","type":"auth
+  gateway refused (0): 
+  orders.count expected 0 observed 0 PASS
+  evidence FAIL, 17 files, checked against anchored manifest hash (sha256 checksum, not a signature)
+  cleanup { "workerGone": true, "detail": "no container with label proofops.run=run_20261104155416_19b4e122bc794d24", "socketRemoved": true }
+
+=== 4. Daily budget used up (limit set to 1, scripted planner): must answer daily_limit and stay that way after a restart
+first start:  {"runId":"run_20261104155426_fd3e4c58d44b753b","created":true,"runToken":"<hidden>"}
+second start: {"error":"daily_limit"} [HTTP 429]
+after restart: {"error":"daily_limit"} [HTTP 429]
+
+=== 5. Control plane receives SIGTERM during a hung mission: worker must not be left running
+started: {"runId":"run_20261104155448_e37268551be3a35d","created":true,"runToken":"<hidden>"}
+before: containers 1
+8s after SIGTERM: containers 0, sockets 1, signer processes for this test 1
+28s after SIGTERM: containers 0, sockets 1
+
+=== 6. Control plane killed outright (SIGKILL) during a hung mission: restart must recover
+started: {"runId":"run_20261104155527_aac7ff45e4d1980a","created":true,"runToken":"<hidden>"}
+8s after SIGKILL: containers 0, sockets 2, signers 1
+33s after SIGKILL: containers 0, sockets 2, signers 1
+after restart: "active":null,"recoveredOnStart":1}
+history: [{"ref":"e4d1980a","mode":"hang","tier":"VULTR_GVISOR_SCRIPTED","status":"failed","verdict":null,"at":"2026-11-04T15:55:27.866Z"},{"ref":"1be3a35d","mode":"hang
+evidence of the killed run: { "dir": "/var/lib/proofops/rt/evidence/run_20261104155527_aac7ff45e4d1980a", "manifestSha256": null, "status": "INCOMPLETE", "reasons": [ "bundle was never sealed (no manifest)" ], "runId": null, "ru
+
+
+=== Leftovers after all tests
+containers 0, sockets 2, signers 1 (1 expected: the public service)
+public service: active active  {"ok":true,"service":"jarvis-proofops","tier":"VULTR_GVISOR_LIVE_MODEL","planner":{"provider":"vultr-serverles
+stale test sockets removed; sockets now 0

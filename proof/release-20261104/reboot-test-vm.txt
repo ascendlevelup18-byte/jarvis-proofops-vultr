@@ -1,0 +1,20 @@
+=== VM reboot test
+"active":null
+before: boot 1b7c6375, up since 2026-11-03 18:06:21, kernel 6.8.0-147-generic
+rebooting at 2026-11-04T15:19:10Z
+public site back: HTTP 200 after 34 seconds
+{"ok":true,"service":"jarvis-proofops","tier":"VULTR_GVISOR_LIVE_MODEL","planner":{"provider":"vultr-serverless-inference","model":"deepseek-v4.1-flash-1017"},"isolation":"gvisor-runsc","codeSha":"85de6ce0b7bc","active":null,"recoveredOnStart":0}
+after: boot dab562aa, up since 2026-11-04 15:19:24, kernel 6.8.0-147-generic
+commit:   85de6ce0b7bce25ff13a16eefee373e00b6a61ca
+planner:  vultr deepseek-v4.1-flash-1017
+health:   {"ok":true,"service":"jarvis-proofops","tier":"VULTR_GVISOR_LIVE_MODEL","planner":{"provider":"vultr-serverless-inference","model":"deepseek
+services: proofops=active caddy=active docker=active
+workers:  0 containers, 0 socket folders
+key file: proofops mode 600
+missions: 70 in the last 24 hours, cap 150
+disk:     19G 143G 12%
+Vultr health route answered HTTP 200
+"runsc"
+0
+drwx--x--x 2 proofops proofops 40 Nov  4 15:19 /run/proofops
+ssh 0

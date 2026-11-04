@@ -1,0 +1,13 @@
+
+package-lock.json: 24 packages, 1 used at runtime
+  21  Apache-2.0
+  3  MIT
+  copyleft or restrictive: none
+  direct runtime dependencies: zod
+
+apps/proofops/worker/package-lock.json: 2 packages, 2 used at runtime
+  2  Apache-2.0
+  copyleft or restrictive: none
+  direct runtime dependencies: playwright
+
+Project license: MIT License

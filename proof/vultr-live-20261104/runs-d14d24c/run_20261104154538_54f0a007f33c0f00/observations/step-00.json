@@ -1,0 +1,41 @@
+{
+  "epoch": 1,
+  "url": "http://store.proofops.test/s/88478ca707d33b043548b1ab/",
+  "title": "Shop · Synthetic Store",
+  "text": "ShopCart Synthetic test store for JARVIS ProofOps. No real products, payments or customers. ProofOps Field Jacket SKU DEMO-001 · $100.00 Add to cart",
+  "elements": [
+    {
+      "ref": "e1",
+      "tag": "a",
+      "text": "Shop",
+      "href": "http://store.proofops.test/s/88478ca707d33b043548b1ab/"
+    },
+    {
+      "ref": "e2",
+      "tag": "a",
+      "text": "Cart",
+      "href": "http://store.proofops.test/s/88478ca707d33b043548b1ab/cart"
+    },
+    {
+      "ref": "e3",
+      "tag": "input",
+      "text": "",
+      "type": "hidden",
+      "name": "sku"
+    },
+    {
+      "ref": "e4",
+      "tag": "input",
+      "text": "",
+      "type": "hidden",
+      "name": "quantity"
+    },
+    {
+      "ref": "e5",
+      "tag": "button",
+      "text": "Add to cart",
+      "type": "submit",
+      "formAction": "http://store.proofops.test/s/88478ca707d33b043548b1ab/cart/add"
+    }
+  ]
+}
