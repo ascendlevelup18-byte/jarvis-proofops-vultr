@@ -24,7 +24,7 @@
   <div class="layout">
     <aside class="missions" aria-labelledby="missions-h">
       <h2 id="missions-h">Missions</h2>
-      <p class="hint">Pick a synthetic store scenario. The model proposes, policy decides, the browser executes, and an independent verifier decides the result.</p>
+      <p class="hint">Pick a synthetic store scenario. The <span id="proposer">planner</span> proposes, policy decides, the browser executes, and an independent verifier decides the result.</p>
       <div id="scenario-list" class="scenario-list" role="radiogroup" aria-label="Scenario"></div>
       <button id="run-btn" class="primary" type="button" disabled>Run mission</button>
       <p id="run-error" class="error" role="alert" hidden></p>
@@ -46,7 +46,7 @@
       </section>
 
       <ol class="pipeline" id="pipeline" aria-label="Execution pipeline">
-        <li data-stage="propose"><span class="dot"></span><span>Model proposes</span></li>
+        <li data-stage="propose"><span class="dot"></span><span id="stage-propose">Planner proposes</span></li>
         <li data-stage="policy"><span class="dot"></span><span>Policy decides</span></li>
         <li data-stage="execute"><span class="dot"></span><span>Browser executes</span></li>
         <li data-stage="verify"><span class="dot"></span><span>Verifier decides</span></li>

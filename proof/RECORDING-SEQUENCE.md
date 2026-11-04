@@ -6,7 +6,7 @@ Before recording, run `node apps/proofops/worker/rehearse.mjs https://45-63-82-1
 
 | Time | Click | What the screen shows |
 |---|---|---|
-| 0:00–0:25 | Nothing | Header: sandbox gVisor (runsc), code version. Six missions. The six stages from "Model proposes" to "Sandbox destroyed". |
+| 0:00–0:25 | Nothing | Header: scripted planner, sandbox gVisor (runsc), code version. Six missions. The six stages from "Planner proposes" to "Sandbox destroyed". With a live model the first stage reads "Model proposes". |
 | 0:25–1:05 | **Correct discount**, then **Run mission** | Steps appear with ALLOWED. Real screenshots. **VERIFIED PASS**, 9000 cents expected and observed on the page and the server. |
 | 1:05–1:45 | **Wrong discount**, then **Run mission** | Same steps. The planner finishes with "checkout reached", and **VERIFIED FAIL** still appears. Point at `dom.total` and `server.total`: expected 9000, observed 9500 cents. |
 | 1:45–2:35 | **Hostile page**, then **Run mission** | The containment panel fills with the page's own attempts: tracking image, fetch, a tunnel request to the canary host and a POST to the metadata address, each "Gateway refused". **CONTAINED: 4 attempts blocked**, `orders.none` 0. |

@@ -42,11 +42,20 @@ async function mission(title, shotName, expect) {
   const blocked = await page.locator("#containment li:not(.empty)").allInnerTexts();
   const teardown = await page.locator('#pipeline li[data-stage="teardown"]').getAttribute("class");
   const shots = await page.locator("#thumbs img").count();
+  // Capture only what a viewer would settle on: every picture loaded, the caption on the newest one, the labels in place.
+  await page.waitForFunction(() => {
+    const newest = document.querySelector("#thumbs button:last-child")?.dataset.file;
+    const label = document.getElementById("shot-label").textContent;
+    return [...document.images].every((i) => i.complete) && (!newest || newest.endsWith(label)) && document.querySelectorAll("#env .chip").length >= 3;
+  }, null, { timeout: 15_000 });
   await page.evaluate(() => window.scrollTo(0, 0)); // a capture taken while scrolled leaves the sticky header over the content
   await page.screenshot({ path: join(out, `${shotName}.png`), fullPage: true });
   const evidence = await (await context.request.get(`${base}/api/runs/${runId}/verify-evidence`)).json();
   const report = await context.request.get(`${base}/api/runs/${runId}/evidence/report.md`);
   const fails = [];
+  const chips = await page.locator("#env .chip").allInnerTexts();
+  if (health.planner.provider !== "vultr-serverless-inference" && !chips.some((c) => /scripted planner/.test(c))) fails.push("scripted planner label not shown");
+  if (health.tier.startsWith("VULTR_GVISOR") && !chips.some((c) => /gVisor/.test(c))) fails.push("gVisor label not shown");
   if (!verdict.includes(expect.verdict)) fails.push(`verdict "${verdict}", expected ${expect.verdict}`);
   if (status.toUpperCase() !== expect.status.toUpperCase()) fails.push(`status ${status}, expected ${expect.status}`);
   if (teardown !== "done") fails.push(`teardown ${teardown}`);

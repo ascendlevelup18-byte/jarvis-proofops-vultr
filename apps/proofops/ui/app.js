@@ -17,23 +17,28 @@ const usd = (cents) => (typeof cents === "number" ? `${cents < 0 ? "-" : ""}$${(
 let scenarios = [];
 let selected = null;
 let current = null; // { runId, stream, screenshots[], containment[], stepsSeen }
+let shotToken = 0;
 
 // ---------- environment ----------
 async function loadHealth() {
-  const env = $("env");
-  env.replaceChildren();
+  const chips = [];
+  const add = (text, cls, title) => { const c = el("li", `chip ${cls}`, text); if (title) c.title = title; chips.push(c); };
   try {
     const h = await api("/api/health");
-    const add = (text, cls, title) => { const c = el("li", `chip ${cls}`, text); if (title) c.title = title; env.append(c); };
     const live = h.tier.startsWith("VULTR_GVISOR");
+    const liveModel = h.planner.provider === "vultr-serverless-inference";
+    $("proposer").textContent = liveModel ? "model" : "scripted planner";
+    $("stage-propose").textContent = liveModel ? "Model proposes" : "Planner proposes";
     add(h.planner.provider === "vultr-serverless-inference" ? `Model: ${h.planner.model} (Vultr Serverless Inference)` : "Model: scripted planner (no live AI)",
       h.planner.provider === "vultr-serverless-inference" ? "ok" : "warn", "Which planner proposes actions in this deployment");
     add(live ? "Sandbox: gVisor (runsc)" : "Sandbox: none (local development)", live ? "ok" : "warn", "Browser worker isolation in this deployment");
     add(`Code ${h.codeSha}`, "", "Git commit of the running control plane");
     if (h.active) add("Mission in progress", "warn");
   } catch {
-    env.append(el("li", "chip warn", "Control plane unreachable"));
+    chips.length = 0;
+    add("Control plane unreachable", "warn");
   }
+  $("env").replaceChildren(...chips);
 }
 
 // ---------- missions ----------
@@ -94,6 +99,7 @@ function resetRunView(scenario, runId) {
   $("containment").replaceChildren(el("li", "empty", "Nothing blocked yet."));
   $("evidence").replaceChildren(el("li", "empty", "Available when the run ends."));
   $("thumbs").replaceChildren();
+  shotToken++;
   $("shot").hidden = true;
   $("shot-empty").hidden = false;
   $("shot-label").textContent = "";
@@ -172,10 +178,16 @@ function addContainment(text, detail, kind = "policy") {
 function showShot(file) {
   if (!current) return;
   const src = `/api/runs/${current.runId}/evidence/${file}`;
-  $("shot").src = src;
-  $("shot").hidden = false;
-  $("shot-empty").hidden = true;
-  $("shot-label").textContent = file.replace("screenshots/", "");
+  const token = ++shotToken;
+  const preload = new Image();
+  preload.onload = () => {
+    if (token !== shotToken) return; // a newer screenshot was chosen while this one loaded
+    $("shot").src = src;
+    $("shot").hidden = false;
+    $("shot-empty").hidden = true;
+    $("shot-label").textContent = file.replace("screenshots/", "");
+  };
+  preload.src = src;
   for (const b of $("thumbs").children) b.setAttribute("aria-current", String(b.dataset.file === file));
 }
 
@@ -229,6 +241,7 @@ function renderResult(snap) {
   v.className = `verdict ${r.verdict}`;
   v.textContent = r.verdict === "PASS" ? "VERIFIED PASS" : r.verdict === "FAIL" ? "VERIFIED FAIL" : "INCONCLUSIVE";
   const blocked = $("containment").querySelectorAll("li:not(.empty)").length;
+  if (!blocked) $("containment").replaceChildren(el("li", "empty", "Nothing was blocked in this run."));
   const sub = [r.error ? `Run ${snap.status.replace("_", " ")}: ${r.error}` : `Run ${snap.status.replace("_", " ")}`];
   if (blocked) sub.push(`CONTAINED: ${blocked} attempt${blocked === 1 ? "" : "s"} blocked`);
   v.append(el("small", "", sub.join(" · ")));
