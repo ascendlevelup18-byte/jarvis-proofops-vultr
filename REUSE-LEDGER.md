@@ -277,3 +277,8 @@ Copied on 2 Nov 2026 from the owner's own repository https://github.com/ascendle
 - Removed npm scripts for ACT III-only tooling: `legacy:check`, `demo:verify`, `test:pwsh`, `api:bench*`, `api:baseline`.
 - Renamed the package to `jarvis-proofops-vultr`, marked it private and MIT.
 - Not copied at all: `api/`, `vercel.json`, `netlify*`, `scripts/`, `legacy-prototype/`, `supabase/config.toml`, deploy scripts, root ACT III status documents, `.vercel/`, any `.env`.
+
+## Removed from the working tree on 4 Nov 2026 (remain in Git history)
+ProofOps does not use these inherited parts, so they were removed before public review: the refund engine and the rest of `apps/api`, the ACT III web app `apps/web`, `data/`, `evals/` and `reference/`. Also removed: `prep/`, the pre-kickoff planning documents and the unused shared-database design.
+
+**Inherited code still in use:** only `apps/api/src/provider/` (the OpenAI-compatible client, its error types and response clean-up) and its test with helper (`apps/api/test/openai-compatible-client.test.ts`, `fake-openai-server.ts`), all unchanged from ACT III. Everything under `apps/proofops/` and `ops/` was written for ProofOps; `apps/proofops` was developed during the event, starting from the 3 Nov kickoff, as its commit dates show.

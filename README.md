@@ -14,7 +14,7 @@ Entry for the Vultr: Agent Rush Hackathon 2026 (lablab.ai), Challenge 1 "Blast R
 Local results are never presented as Vultr or live-model evidence. Every evidence bundle records its tier.
 
 ## Run it locally
-Requires Node 24 and Chromium for Playwright (`cd apps/proofops/worker && npm ci && npx playwright install chromium`).
+Requires Node 24. Install Playwright's Chromium once: `cd apps/proofops/worker && npm ci && npx playwright install chromium`.
 ```
 npm ci
 npm run proofops:demo      # operator console on http://127.0.0.1:4317 (scripted planner, no sandbox; labelled as such)
@@ -41,13 +41,16 @@ worker destroyed). Evidence bundles land in `evidence-local/<run-id>/`; check on
 ## Prior work disclosed
 JARVIS ProofOps is a new commerce QA and secure browser-execution product developed for Vultr Agent Rush, built on selected reusable foundations from our earlier JARVIS engineering work. It is not a clean-room implementation, and it is not a renamed ACT III.
 
-This repository starts from a sanitized snapshot of the same author's earlier project, **JARVIS ACT III** (https://github.com/ascendlevelup18-byte/jarvisACTIII, commit `c69ca2c`). Every inherited file, its source commit and checksum are listed in [REUSE-LEDGER.md](REUSE-LEDGER.md). The disclosed import is commit `a6ac809`, following initial commit `ac9b087`. Later commits include pre-kickoff preparation and must not all be represented as functionality developed during the event. Refund-specific ACT III features will be removed at kickoff.
+This repository starts from a sanitized snapshot of the same author's earlier project, **JARVIS ACT III** (https://github.com/ascendlevelup18-byte/jarvisACTIII, commit `c69ca2c`). Every inherited file, its source commit and checksum are listed in [REUSE-LEDGER.md](REUSE-LEDGER.md). The disclosed import is commit `a6ac809`, following initial commit `ac9b087`. Later commits include pre-kickoff preparation and must not all be represented as functionality developed during the event. Refund-specific ACT III features have since been removed.
 
-## Isolation from JARVIS ACT III
-- Separate repository and Git history; no remote points at `jarvisACTIII`.
-- No ACT III secrets, environment files, Vercel configuration or deployment references were copied.
-- ProofOps will run on its own Vultr VM with its own credentials and URL.
-- Database: the competition build uses SQLite on the ProofOps VM. A `proofops` schema in the shared ACT III Supabase project is designed and tested only on a disposable local database ([prep/MIGRATION-REVIEW.md](prep/MIGRATION-REVIEW.md)); it is **not created** and needs owner approval.
+## Separate from JARVIS ACT III
+Separate repository, history, VM and credentials. No ACT III secrets, environment files or deployment settings were copied. Run data is kept in SQLite on the ProofOps VM.
+
+## Inherited code in use
+Only the OpenAI-compatible client in `apps/api/src/provider/`. See [REUSE-LEDGER.md](REUSE-LEDGER.md).
+
+## Third-party software
+Runtime: [Playwright](https://playwright.dev) (Apache-2.0), [zod](https://zod.dev) (MIT). On the VM: Docker, [gVisor](https://gvisor.dev) (Apache-2.0), [Caddy](https://caddyserver.com) (Apache-2.0), Node.js (MIT).
 
 ## License
 MIT (see [LICENSE](LICENSE)).

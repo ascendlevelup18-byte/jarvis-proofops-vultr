@@ -36,7 +36,7 @@ record("typecheck", "UNIT", () => {
   const r = spawnSync(node, [join(ROOT, "node_modules", "typescript", "bin", "tsc"), "-p", "apps/proofops"], { cwd: ROOT, encoding: "utf8" });
   return { ok: r.status === 0, detail: r.status === 0 ? "clean" : (r.stdout || r.stderr).split("\n").slice(0, 3).join(" | ") };
 });
-record("unit + HTTP + model-fault tests", "UNIT/HTTP", () => nodeTest(["apps/proofops/test/*.test.ts"]));
+record("unit + HTTP + model-fault tests", "UNIT/HTTP", () => nodeTest(["apps/proofops/test/*.test.ts", "apps/api/test/*.test.ts"]));
 record("local Chromium + forced-attack e2e", "LOCAL_CHROMIUM/LOCAL_FORCED_ATTACK", () => nodeTest(["--test-concurrency=1", "apps/proofops/e2e/*.test.ts"]));
 
 // Smoke missions against a throwaway control plane (own port, own evidence and database directories).
