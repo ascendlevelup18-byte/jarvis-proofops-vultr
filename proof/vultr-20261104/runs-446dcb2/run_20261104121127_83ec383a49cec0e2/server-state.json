@@ -1,0 +1,18 @@
+{
+  "sid": "2b98a5c120009e68c77fcdff",
+  "runId": "run_20261104121127_83ec383a49cec0e2",
+  "mode": "wrong-total",
+  "cart": {
+    "sku": "DEMO-001",
+    "quantity": 1
+  },
+  "coupon": "SAVE10",
+  "totals": {
+    "subtotalCents": 10000,
+    "discountCents": 500,
+    "totalCents": 9500
+  },
+  "checkoutReached": true,
+  "orders": [],
+  "rejectedCheckouts": []
+}

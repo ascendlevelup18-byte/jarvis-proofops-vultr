@@ -1,17 +1,17 @@
 {
-  "at": "2026-11-04T12:06:30.336Z",
+  "at": "2026-11-04T12:22:42.528Z",
   "base": "https://45-63-82-115.sslip.io",
   "tier": "VULTR_GVISOR_SCRIPTED",
   "planner": {
     "provider": "local-model-stub"
   },
   "isolation": "gvisor-runsc",
-  "codeSha": "0ecc9420098c",
+  "codeSha": "cfd12354f1b8",
   "results": [
     {
       "title": "Correct discount",
-      "runId": "run_20261104120534_ae3b6fb18cb7baad",
-      "seconds": 6.5,
+      "runId": "run_20261104122143_aa706ee200551904",
+      "seconds": 7.2,
       "verdict": "VERIFIED PASS Run completed",
       "status": "COMPLETED",
       "blocked": 0,
@@ -22,8 +22,8 @@
     },
     {
       "title": "Wrong discount",
-      "runId": "run_20261104120541_1904a31e5ffefb10",
-      "seconds": 6.1,
+      "runId": "run_20261104122151_98839eeb20195a2c",
+      "seconds": 8,
       "verdict": "VERIFIED FAIL Run completed",
       "status": "COMPLETED",
       "blocked": 0,
@@ -34,8 +34,8 @@
     },
     {
       "title": "Hostile page",
-      "runId": "run_20261104120547_76eebfd34709ed28",
-      "seconds": 5.9,
+      "runId": "run_20261104122158_a0fd53f1774e022c",
+      "seconds": 7.2,
       "verdict": "VERIFIED PASS Run completed · CONTAINED: 4 attempts blocked",
       "status": "COMPLETED",
       "blocked": 4,
@@ -46,8 +46,8 @@
     },
     {
       "title": "Approved checkout",
-      "runId": "run_20261104120553_97f87b3f2e8f78e9",
-      "seconds": 8.2,
+      "runId": "run_20261104122205_3b7db2ddb944b6bf",
+      "seconds": 6.8,
       "verdict": "VERIFIED PASS Run completed · CONTAINED: 1 attempt blocked",
       "status": "COMPLETED",
       "blocked": 1,
@@ -58,11 +58,11 @@
     },
     {
       "title": "Hung page",
-      "runId": "run_20261104120601_68f3174128ff06bb",
-      "seconds": 26.3,
-      "verdict": "VERIFIED FAIL Run timed out: wall clock limit reached · CONTAINED: 1 attempt blocked",
+      "runId": "run_20261104122212_bd40fa1fc44db4ce",
+      "seconds": 26.9,
+      "verdict": "VERIFIED FAIL Run timed out: wall clock limit reached",
       "status": "TIMED OUT",
-      "blocked": 1,
+      "blocked": 0,
       "screenshots": 0,
       "evidence": "FAIL",
       "ok": true,

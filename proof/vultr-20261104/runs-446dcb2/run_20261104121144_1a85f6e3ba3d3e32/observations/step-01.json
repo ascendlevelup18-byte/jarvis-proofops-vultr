@@ -1,0 +1,40 @@
+{
+  "epoch": 2,
+  "url": "http://store.proofops.test/s/6c46304abc67929b6adc281e/cart",
+  "title": "Cart · Synthetic Store",
+  "text": "ShopCart Synthetic test store for JARVIS ProofOps. No real products, payments or customers. Your cart ProofOps Field Jacket × 1 Subtotal $100.00 Discount $0.00 Total $100.00 Promo code Apply code Proceed to checkout",
+  "elements": [
+    {
+      "ref": "e1",
+      "tag": "a",
+      "text": "Shop",
+      "href": "http://store.proofops.test/s/6c46304abc67929b6adc281e/"
+    },
+    {
+      "ref": "e2",
+      "tag": "a",
+      "text": "Cart",
+      "href": "http://store.proofops.test/s/6c46304abc67929b6adc281e/cart"
+    },
+    {
+      "ref": "e3",
+      "tag": "input",
+      "text": "Promo code",
+      "type": "text",
+      "name": "code"
+    },
+    {
+      "ref": "e4",
+      "tag": "button",
+      "text": "Apply code",
+      "type": "submit",
+      "formAction": "http://store.proofops.test/s/6c46304abc67929b6adc281e/cart/coupon"
+    },
+    {
+      "ref": "e5",
+      "tag": "a",
+      "text": "Proceed to checkout",
+      "href": "http://store.proofops.test/s/6c46304abc67929b6adc281e/checkout"
+    }
+  ]
+}

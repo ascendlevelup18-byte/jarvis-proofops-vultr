@@ -1,0 +1,30 @@
+{
+  "sid": "6c46304abc67929b6adc281e",
+  "runId": "run_20261104121144_1a85f6e3ba3d3e32",
+  "mode": "normal",
+  "cart": {
+    "sku": "DEMO-001",
+    "quantity": 1
+  },
+  "coupon": "SAVE10",
+  "totals": {
+    "subtotalCents": 10000,
+    "discountCents": 1000,
+    "totalCents": 9000
+  },
+  "checkoutReached": true,
+  "orders": [
+    {
+      "orderId": "SYN-FCD9E23B",
+      "totalCents": 9000,
+      "at": "2026-11-04T12:11:49.536Z",
+      "approvalNonce": "7f6d12bfb2773712ab4f800a2c29f56e"
+    }
+  ],
+  "rejectedCheckouts": [
+    {
+      "at": "2026-11-04T12:11:49.876Z",
+      "reason": "replayed"
+    }
+  ]
+}

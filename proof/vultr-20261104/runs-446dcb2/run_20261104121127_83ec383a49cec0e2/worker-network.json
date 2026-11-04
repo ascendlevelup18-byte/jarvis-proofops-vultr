@@ -1,0 +1,44 @@
+[
+  {
+    "at": "2026-11-04T12:11:29.939Z",
+    "kind": "request",
+    "method": "GET",
+    "url": "http://store.proofops.test/s/2b98a5c120009e68c77fcdff/"
+  },
+  {
+    "at": "2026-11-04T12:11:30.334Z",
+    "kind": "request",
+    "method": "POST",
+    "url": "http://store.proofops.test/s/2b98a5c120009e68c77fcdff/cart/add"
+  },
+  {
+    "at": "2026-11-04T12:11:30.341Z",
+    "kind": "request",
+    "method": "GET",
+    "url": "http://store.proofops.test/s/2b98a5c120009e68c77fcdff/cart"
+  },
+  {
+    "at": "2026-11-04T12:11:30.861Z",
+    "kind": "request",
+    "method": "POST",
+    "url": "http://store.proofops.test/s/2b98a5c120009e68c77fcdff/cart/coupon"
+  },
+  {
+    "at": "2026-11-04T12:11:30.867Z",
+    "kind": "request",
+    "method": "GET",
+    "url": "http://store.proofops.test/s/2b98a5c120009e68c77fcdff/cart"
+  },
+  {
+    "at": "2026-11-04T12:11:31.324Z",
+    "kind": "request",
+    "method": "GET",
+    "url": "http://store.proofops.test/s/2b98a5c120009e68c77fcdff/checkout"
+  },
+  {
+    "at": "2026-11-04T12:11:31.765Z",
+    "kind": "request",
+    "method": "GET",
+    "url": "http://store.proofops.test/s/2b98a5c120009e68c77fcdff/cart"
+  }
+]
