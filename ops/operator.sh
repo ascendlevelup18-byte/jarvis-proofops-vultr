@@ -86,7 +86,7 @@ case "$cmd" in
     echo "Do not present these runs as live-model evidence. To go back: operator.sh live"
     ;;
   live)
-    if ! "$0" key-check; then echo "The key was not accepted, so the demo stays as it is." >&2; exit 1; fi
+    if ! bash "$0" key-check; then echo "The key was not accepted, so the demo stays as it is." >&2; exit 1; fi
     bash "$APP/ops/deploy-app.sh" "$(head_sha)" "${2:-$DEFAULT_MODEL}" "$(deployment)" "$(hostname_)"
     echo "PUBLIC DEMO IS NOW LIVE with ${2:-$DEFAULT_MODEL}."
     ;;
