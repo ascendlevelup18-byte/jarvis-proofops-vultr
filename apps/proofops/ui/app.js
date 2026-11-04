@@ -26,7 +26,7 @@ async function loadHealth() {
     const h = await api("/api/health");
     const add = (text, cls, title) => { const c = el("li", `chip ${cls}`, text); if (title) c.title = title; env.append(c); };
     const live = h.tier.startsWith("VULTR_GVISOR");
-    add(h.planner.provider === "vultr-serverless-inference" ? `Model: ${h.planner.model} (Vultr Serverless Inference)` : "Model: scripted stub (local)",
+    add(h.planner.provider === "vultr-serverless-inference" ? `Model: ${h.planner.model} (Vultr Serverless Inference)` : "Model: scripted planner (no live AI)",
       h.planner.provider === "vultr-serverless-inference" ? "ok" : "warn", "Which planner proposes actions in this deployment");
     add(live ? "Sandbox: gVisor (runsc)" : "Sandbox: none (local development)", live ? "ok" : "warn", "Browser worker isolation in this deployment");
     add(`Code ${h.codeSha}`, "", "Git commit of the running control plane");

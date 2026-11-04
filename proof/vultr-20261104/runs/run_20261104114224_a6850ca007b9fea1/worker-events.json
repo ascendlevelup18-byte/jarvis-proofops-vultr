@@ -1,0 +1,28 @@
+[
+  {
+    "at": "2026-11-04T11:42:25.562Z",
+    "runId": "run_20261104114224_a6850ca007b9fea1",
+    "type": "worker.ready",
+    "node": "v26.13.0",
+    "bridge": true,
+    "profile": "ephemeral",
+    "envKeys": [
+      "HOME",
+      "HOSTNAME",
+      "LANG",
+      "LC_ALL",
+      "NODE_ENV",
+      "PATH",
+      "PLAYWRIGHT_BROWSERS_PATH",
+      "PROOFOPS_CHROMIUM_NO_SANDBOX",
+      "PROOFOPS_GATEWAY_SOCKET",
+      "PROOFOPS_RUN_ID"
+    ]
+  },
+  {
+    "at": "2026-11-04T11:42:26.851Z",
+    "runId": "run_20261104114224_a6850ca007b9fea1",
+    "type": "worker.cookies_at_start",
+    "count": 0
+  }
+]

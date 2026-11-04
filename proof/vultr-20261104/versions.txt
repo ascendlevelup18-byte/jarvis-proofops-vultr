@@ -1,0 +1,8 @@
+docker 29.9.3
+runsc version release-20261102.0
+spec: 1.2.1
+v24.20.0
+v2.11.8 h1:E2pv1BoZ5bJaWqFkU6QvLa21iGAX8bDzlEQG4dDQ/Vc=
+6.8.0-147-generic
+Ubuntu 24.04.5 LTS
+7a2ccf6a0a59 3.64GB

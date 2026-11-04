@@ -1,0 +1,16 @@
+=== 2026-11-04T11:45:48Z host view during a live mission
+container: proofops-run_20261104114530_4798f7700b7d01e2
+Runtime=runsc Network=none ReadOnly=true Privileged=false User=10001:10001 Memory=1073741824 CapDrop=[ALL] Binds=[/run/proofops/run_20261104114530_4798f7700b7d01e2:/run/proofops]
+stats: cpu=0.18% mem=199MiB / 1GiB pids=50
+--- runsc processes on the host (Sentry and gofer)
+  20654 root     11596 runsc-gofer --log-format=json --host-uds=open --platform=systrap --systemd-cgroup=true --root=/var/run/docker/runtime-runc/moby --log=/run/containe
+  20658 root     141680 runsc-sandbox --root=/var/run/docker/runtime-runc/moby --log=/run/containerd/io.containerd.runtime.v2.task/moby/24004f620c78978e4bf2f6bf663af76328
+--- Chromium as seen from inside the sandbox
+Linux version 4.19.0-gvisor #1 SMP Sun Jan 10 15:06:54 PST 2016
+   13 10001    /ms-playwright/chromium_headless_shell-1248/chrome-headless-shell-linux64/chrome-headless-shell
+   16 10001    /ms-playwright/chromium_headless_shell-1248/chrome-headless-shell-linux64/chrome-headless-shell
+   17 10001    /ms-playwright/chromium_headless_shell-1248/chrome-headless-shell-linux64/chrome-headless-shell
+--- is Chromium visible as a host process? (should not be: gVisor runs it inside the Sentry)
+0
+--- public listeners
+0.0.0.0:22 127.0.0.1:2019 127.0.0.1:38975 127.0.0.1:41715 127.0.0.1:4317 127.0.0.53%lo:53 127.0.0.54:53 [::]:22 *:443 *:80 

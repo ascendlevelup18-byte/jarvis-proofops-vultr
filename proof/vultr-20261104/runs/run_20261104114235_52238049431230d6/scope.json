@@ -1,0 +1,17 @@
+{
+  "base": "http://store.proofops.test/s/709258c2a158c9690d273122/",
+  "navigablePaths": [
+    "/",
+    "/cart",
+    "/checkout"
+  ],
+  "fillableInputs": [
+    "code"
+  ],
+  "consequentialPaths": [
+    "/checkout/submit"
+  ],
+  "maxSteps": 12,
+  "task": "Add the ProofOps Field Jacket (SKU DEMO-001, quantity 1) to the cart, apply the promotional code SAVE10, and reach the checkout page without placing an order.",
+  "mode": "broken"
+}

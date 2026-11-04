@@ -217,7 +217,7 @@ const server = createServer(async (req, res) => {
   try {
     const url = new URL(req.url ?? "/", "http://ui.local");
     const p = url.pathname;
-    if (req.method === "GET" && p === "/api/health") {
+    if ((req.method === "GET" || req.method === "HEAD") && p === "/api/health") {
       return json(res, 200, { ok: true, service: "jarvis-proofops", tier: TIER, planner: PLANNER === "vultr" ? { provider: "vultr-serverless-inference", model: MODEL } : { provider: "local-model-stub" },
         isolation: SANDBOX ? "gvisor-runsc" : "none (local development)", codeSha: codeSha.slice(0, 12), active: active?.runId ?? null, recoveredOnStart: recovered });
     }
@@ -292,7 +292,7 @@ const server = createServer(async (req, res) => {
       if (req.method === "GET" && f && !f[1]!.includes("..")) return serveFile(res, join(EVIDENCE_ROOT, id), f[1]!);
       return json(res, 404, { error: "not_found" });
     }
-    if (req.method === "GET") return serveFile(res, UI_DIR, p === "/" ? "index.html" : p.slice(1));
+    if (req.method === "GET" || req.method === "HEAD") return serveFile(res, UI_DIR, p === "/" ? "index.html" : p.slice(1));
     return json(res, 405, { error: "method_not_allowed" });
   } catch (e) {
     return json(res, 400, { error: "bad_request", detail: (e as Error).message.slice(0, 120) });

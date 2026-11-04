@@ -1,0 +1,20 @@
+{
+  "epoch": 5,
+  "url": "http://store.proofops.test/s/709258c2a158c9690d273122/checkout",
+  "title": "Error · Synthetic Store",
+  "text": "ShopCart Synthetic test store for JARVIS ProofOps. No real products, payments or customers. Something went wrong Checkout is unavailable (code CHK-500).",
+  "elements": [
+    {
+      "ref": "e1",
+      "tag": "a",
+      "text": "Shop",
+      "href": "http://store.proofops.test/s/709258c2a158c9690d273122/"
+    },
+    {
+      "ref": "e2",
+      "tag": "a",
+      "text": "Cart",
+      "href": "http://store.proofops.test/s/709258c2a158c9690d273122/cart"
+    }
+  ]
+}
