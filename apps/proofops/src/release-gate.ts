@@ -1,7 +1,7 @@
 // Non-destructive local release gate: `npm run proofops:release`.
 // Runs every local tier, starts a throwaway control plane on a free port for the smoke missions, classifies all
 // produced evidence, scans for secrets, statically checks deployment files, and reports infrastructure tiers as
-// BLOCKED (never as passed). Writes evidence-local/release-gate.json and exits non-zero on any FAIL.
+// NOT_RUN (never as passed). Writes evidence-local/release-gate.json and exits non-zero on any FAIL.
 import { spawn, spawnSync, execFileSync } from "node:child_process";
 import { createServer } from "node:net";
 import { mkdtempSync, readFileSync, readdirSync, writeFileSync, mkdirSync, existsSync, rmSync } from "node:fs";
@@ -97,7 +97,7 @@ for (const [gate, tier, status, why] of [
   ["gVisor boundary probe (vm-boundary.ts)", "VULTR_GVISOR", "NOT_RUN", "runs on the VM only; last result in proof/"],
   ["sandboxed missions on the VM", "VULTR_GVISOR", "NOT_RUN", "runs on the VM only; last result in proof/"],
   ["public HTTPS rehearsal (rehearse.mjs)", "VULTR_GVISOR", "NOT_RUN", "run against the deployed URL; last result in proof/"],
-  ["live Vultr model mission", "VULTR_LIVE_MODEL", "BLOCKED", "needs the owner's inference approval"],
+  ["live Vultr model missions", "VULTR_LIVE_MODEL", "NOT_RUN", "runs on the VM and costs tokens; last result in proof/"],
 ] as const) {
   gates.push({ gate, tier, status: status as Status, detail: why, seconds: 0 });
   console.log(`${status.padEnd(7)} ${gate.padEnd(34)} ${why}`);
