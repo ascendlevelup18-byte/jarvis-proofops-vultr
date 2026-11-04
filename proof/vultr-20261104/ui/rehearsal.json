@@ -1,0 +1,74 @@
+{
+  "at": "2026-11-04T11:50:55.188Z",
+  "base": "https://45-63-82-115.sslip.io",
+  "tier": "VULTR_GVISOR_SCRIPTED",
+  "planner": {
+    "provider": "local-model-stub"
+  },
+  "isolation": "gvisor-runsc",
+  "codeSha": "061c98be2bdc",
+  "results": [
+    {
+      "title": "Correct discount",
+      "runId": "run_20261104114959_e8014cb5dfc6b0d7",
+      "seconds": 6.5,
+      "verdict": "VERIFIED PASS Run completed",
+      "status": "COMPLETED",
+      "blocked": 0,
+      "screenshots": 5,
+      "evidence": "PASS",
+      "ok": true,
+      "fails": []
+    },
+    {
+      "title": "Wrong discount",
+      "runId": "run_20261104115005_4143a1a9cee5592e",
+      "seconds": 6.4,
+      "verdict": "VERIFIED FAIL Run completed",
+      "status": "COMPLETED",
+      "blocked": 0,
+      "screenshots": 5,
+      "evidence": "FAIL",
+      "ok": true,
+      "fails": []
+    },
+    {
+      "title": "Hostile page",
+      "runId": "run_20261104115012_0228117f9acefa00",
+      "seconds": 7.3,
+      "verdict": "VERIFIED PASS Run completed · CONTAINED: 4 attempts blocked",
+      "status": "COMPLETED",
+      "blocked": 4,
+      "screenshots": 5,
+      "evidence": "PASS",
+      "ok": true,
+      "fails": []
+    },
+    {
+      "title": "Approved checkout",
+      "runId": "run_20261104115019_f25ef174f2168e4a",
+      "seconds": 7.4,
+      "verdict": "VERIFIED PASS Run completed · CONTAINED: 1 attempt blocked",
+      "status": "COMPLETED",
+      "blocked": 1,
+      "screenshots": 6,
+      "evidence": "PASS",
+      "ok": true,
+      "fails": []
+    },
+    {
+      "title": "Hung page",
+      "runId": "run_20261104115026_90f4fac66afc9d43",
+      "seconds": 26.3,
+      "verdict": "VERIFIED FAIL Run timed out: wall clock limit reached · CONTAINED: 1 attempt blocked",
+      "status": "TIMED OUT",
+      "blocked": 1,
+      "screenshots": 0,
+      "evidence": "FAIL",
+      "ok": true,
+      "fails": []
+    }
+  ],
+  "problems": [],
+  "ok": true
+}

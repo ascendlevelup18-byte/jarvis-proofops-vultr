@@ -93,14 +93,14 @@ record("working tree clean (no evidence drift)", "REPO", () => {
   return { ok: dirty.length === 0, detail: dirty.length ? `${dirty.length} uncommitted: ${dirty.slice(0, 3).join(", ")}` : "clean" };
 });
 
-for (const [gate, tier, why] of [
-  ["gVisor boundary probe (vm-boundary.ts)", "VULTR_GVISOR", "needs the VM; SSH host key not yet independently verified"],
-  ["sandboxed missions on the VM", "VULTR_GVISOR", "needs the VM"],
-  ["live Vultr model mission", "VULTR_LIVE_MODEL", "needs the VM and the owner's inference approval"],
-  ["public HTTPS judge access", "VULTR_GVISOR", "needs the VM"],
+for (const [gate, tier, status, why] of [
+  ["gVisor boundary probe (vm-boundary.ts)", "VULTR_GVISOR", "NOT_RUN", "runs on the VM only; last result in proof/"],
+  ["sandboxed missions on the VM", "VULTR_GVISOR", "NOT_RUN", "runs on the VM only; last result in proof/"],
+  ["public HTTPS rehearsal (rehearse.mjs)", "VULTR_GVISOR", "NOT_RUN", "run against the deployed URL; last result in proof/"],
+  ["live Vultr model mission", "VULTR_LIVE_MODEL", "BLOCKED", "needs the owner's inference approval"],
 ] as const) {
-  gates.push({ gate, tier, status: "BLOCKED", detail: why, seconds: 0 });
-  console.log(`BLOCKED ${gate.padEnd(34)} ${why}`);
+  gates.push({ gate, tier, status: status as Status, detail: why, seconds: 0 });
+  console.log(`${status.padEnd(7)} ${gate.padEnd(34)} ${why}`);
 }
 
 const failed = gates.filter((g) => g.status === "FAIL").length;
@@ -108,5 +108,5 @@ const summary = { at: new Date().toISOString(), head: execFileSync("git", ["rev-
   passed: gates.filter((g) => g.status === "PASS").length, failed, blocked: gates.filter((g) => g.status === "BLOCKED").length };
 mkdirSync(join(ROOT, "evidence-local"), { recursive: true });
 writeFileSync(join(ROOT, "evidence-local", "release-gate.json"), JSON.stringify(summary, null, 2));
-console.log(`\n${summary.passed} passed, ${failed} failed, ${summary.blocked} blocked (infrastructure). Report: evidence-local/release-gate.json`);
+console.log(`\n${summary.passed} passed, ${failed} failed, ${summary.blocked} blocked, ${gates.filter((g) => g.status === "NOT_RUN").length} not run here (VM tier). Report: evidence-local/release-gate.json`);
 process.exit(failed ? 1 : 0);

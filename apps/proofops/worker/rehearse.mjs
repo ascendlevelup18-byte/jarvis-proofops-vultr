@@ -24,7 +24,10 @@ const results = [];
 async function mission(title, shotName, expect) {
   const t0 = Date.now();
   await page.locator(".scenario", { hasText: title }).first().click();
+  const previousRun = await page.locator("#run-id").innerText();
   await page.locator("#run-btn").click();
+  // The previous verdict stays on screen until the new run is accepted; never read it by mistake.
+  await page.waitForFunction((prev) => { const t = document.getElementById("run-id").textContent; return t && t !== prev; }, previousRun, { timeout: 15_000 });
   if (expect.approve) {
     await page.locator("#approval:not([hidden])").waitFor({ timeout: 60_000 });
     await page.locator("#approval").scrollIntoViewIfNeeded();

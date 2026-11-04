@@ -146,6 +146,7 @@ button:disabled { cursor: not-allowed; opacity: 0.5; }
 .checks td.FAIL { color: var(--fail); font-weight: 700; }
 .checks td.INCONCLUSIVE { color: var(--warn); }
 .checks tr.FAIL td:first-child { color: var(--fail); }
+@media (min-width: 761px) { .checks td:first-child { min-width: 168px; } }
 
 .containment, .evidence { list-style: none; padding: 0; margin: 0 0 18px; display: grid; gap: 6px; }
 .containment li { font-size: 12px; padding: 8px 10px; border-radius: 8px; background: var(--bg-2); border: 1px solid var(--line); overflow-wrap: anywhere; }
