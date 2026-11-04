@@ -30,7 +30,8 @@ async function mission(title, shotName, expect) {
   await page.waitForFunction((prev) => { const t = document.getElementById("run-id").textContent; return t && t !== prev; }, previousRun, { timeout: 15_000 });
   if (expect.approve) {
     await page.locator("#approval:not([hidden])").waitFor({ timeout: 60_000 });
-    await page.locator("#approval").scrollIntoViewIfNeeded();
+    await page.evaluate(() => document.getElementById("approval").scrollIntoView({ block: "center" }));
+    await page.waitForTimeout(400);
     await page.screenshot({ path: join(out, `${shotName}-approval.png`) });
     // Hold the approval response until the run has finished: the worst order a slow connection can produce.
     await page.route("**/approve", async (route) => {
@@ -58,11 +59,20 @@ async function mission(title, shotName, expect) {
     const label = document.getElementById("shot-label").textContent;
     return [...document.images].every((i) => i.complete) && (!newest || newest.endsWith(label)) && document.querySelectorAll("#env .chip").length >= 3;
   }, null, { timeout: 15_000 });
+  await page.evaluate(() => { document.getElementById("timeline").scrollTop = 0; });
   await page.evaluate(() => window.scrollTo(0, 0)); // a capture taken while scrolled leaves the sticky header over the content
   await page.screenshot({ path: join(out, `${shotName}.png`), fullPage: true });
   const evidence = await (await context.request.get(`${base}/api/runs/${runId}/verify-evidence`)).json();
   const report = await context.request.get(`${base}/api/runs/${runId}/evidence/report.md`);
   const fails = [];
+  if (expect.verifyShot) {
+    await page.locator("#evidence button").click();
+    await page.locator("#evidence button", { hasText: "Intact" }).waitFor({ timeout: 15_000 });
+    await page.evaluate(() => document.getElementById("evidence").scrollIntoView({ block: "center" }));
+    await page.waitForTimeout(300);
+    await page.screenshot({ path: join(out, expect.verifyShot) });
+    await page.evaluate(() => window.scrollTo(0, 0));
+  }
   const chips = await page.locator("#env .chip").allInnerTexts();
   if (health.planner.provider !== "vultr-serverless-inference" && !chips.some((c) => /scripted planner/.test(c))) fails.push("scripted planner label not shown");
   if (health.tier.startsWith("VULTR_GVISOR") && !chips.some((c) => /gVisor/.test(c))) fails.push("gVisor label not shown");
@@ -82,7 +92,7 @@ async function mission(title, shotName, expect) {
 
 await mission("Correct discount", "02-correct-discount", { verdict: "VERIFIED PASS", status: "Completed" });
 await mission("Wrong discount", "03-wrong-discount", { verdict: "VERIFIED FAIL", status: "Completed" });
-await mission("Hostile page", "04-hostile-page", { verdict: "VERIFIED PASS", status: "Completed", minBlocked: 3 });
+await mission("Hostile page", "04-hostile-page", { verdict: "VERIFIED PASS", status: "Completed", minBlocked: 3, verifyShot: "08-evidence-verified.png" });
 await mission("Approved checkout", "05-approved-checkout", { verdict: "VERIFIED PASS", status: "Completed", approve: true, replay: true, orders: 1 });
 await mission("Hung page", "06-hung-page", { verdict: "VERIFIED FAIL", status: "Timed out", hardStop: true });
 
