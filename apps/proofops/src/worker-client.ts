@@ -145,7 +145,14 @@ export async function launchWorker(spec: LaunchSpec): Promise<WorkerHandle> {
       if (spec.kind === "local") return { workerGone: exited, detail: exited ? "local worker process exited" : "local worker did not exit" };
       // Confirm with Docker itself, by label: the container must not exist any more.
       await run("docker", ["rm", "-f", containerName!]).catch(() => {});
-      const { stdout } = await run("docker", ["ps", "-a", "-q", "--filter", `label=proofops.run=${spec.runId}`]).catch(() => ({ stdout: "error" }));
+      // --rm may already be removing it: `docker rm -f` then returns at once while the container stays listed for a
+      // moment. Give Docker a bounded time to finish; if it is still listed after that, teardown is reported as not proven.
+      let stdout = "";
+      for (let i = 0; i < 20; i++) {
+        ({ stdout } = await run("docker", ["ps", "-a", "-q", "--filter", `label=proofops.run=${spec.runId}`]).catch(() => ({ stdout: "error" })));
+        if (stdout.trim() === "") break;
+        await new Promise((r) => setTimeout(r, 500));
+      }
       const gone = stdout.trim() === "";
       return { workerGone: gone, detail: gone ? `no container with label proofops.run=${spec.runId}` : `container still listed: ${stdout.trim()}` };
     },
