@@ -88,7 +88,7 @@ for (let i = 0; i < 40 && inspected === null; i++) {
       user: JSON.parse(user!), envNames: (JSON.parse(env!) as string[]).map((e) => e.split("=")[0]) };
   } catch { /* not started yet */ }
 }
-const status = await new Promise<number | null>((r) => child.on("exit", (code) => r(code)));
+const status = await new Promise<number | null>((r) => child.on("close", (code) => r(code)));
 clearTimeout(killTimer);
 const res = { stdout, stderr, status };
 const inspectRuntime = (() => { try { return execFileSync("docker", ["info", "--format", "{{json .Runtimes}}"], { encoding: "utf8" }).trim(); } catch { return "unavailable"; } })();
