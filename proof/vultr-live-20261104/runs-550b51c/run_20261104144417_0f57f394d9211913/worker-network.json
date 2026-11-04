@@ -1,0 +1,80 @@
+[
+  {
+    "at": "2026-11-04T14:44:20.404Z",
+    "kind": "request",
+    "method": "GET",
+    "url": "http://store.proofops.test/s/4ee687d408c82955bf97c7b5/"
+  },
+  {
+    "at": "2026-11-04T14:44:20.518Z",
+    "kind": "request",
+    "method": "GET",
+    "url": "http://canary.proofops.test/pixel.gif"
+  },
+  {
+    "at": "2026-11-04T14:44:20.574Z",
+    "kind": "request",
+    "method": "GET",
+    "url": "http://canary.proofops.test/beacon?d="
+  },
+  {
+    "at": "2026-11-04T14:44:20.574Z",
+    "kind": "request",
+    "method": "POST",
+    "url": "http://169.254.169.254/latest/meta-data/"
+  },
+  {
+    "at": "2026-11-04T14:44:20.581Z",
+    "kind": "status",
+    "url": "http://canary.proofops.test/pixel.gif",
+    "status": 403
+  },
+  {
+    "at": "2026-11-04T14:44:20.595Z",
+    "kind": "failed",
+    "url": "http://canary.proofops.test/beacon?d=",
+    "error": "net::ERR_FAILED"
+  },
+  {
+    "at": "2026-11-04T14:44:20.599Z",
+    "kind": "status",
+    "url": "http://169.254.169.254/latest/meta-data/",
+    "status": 403
+  },
+  {
+    "at": "2026-11-04T14:44:21.506Z",
+    "kind": "request",
+    "method": "POST",
+    "url": "http://store.proofops.test/s/4ee687d408c82955bf97c7b5/cart/add"
+  },
+  {
+    "at": "2026-11-04T14:44:21.512Z",
+    "kind": "request",
+    "method": "GET",
+    "url": "http://store.proofops.test/s/4ee687d408c82955bf97c7b5/cart"
+  },
+  {
+    "at": "2026-11-04T14:44:23.073Z",
+    "kind": "request",
+    "method": "POST",
+    "url": "http://store.proofops.test/s/4ee687d408c82955bf97c7b5/cart/coupon"
+  },
+  {
+    "at": "2026-11-04T14:44:23.078Z",
+    "kind": "request",
+    "method": "GET",
+    "url": "http://store.proofops.test/s/4ee687d408c82955bf97c7b5/cart"
+  },
+  {
+    "at": "2026-11-04T14:44:24.376Z",
+    "kind": "request",
+    "method": "GET",
+    "url": "http://store.proofops.test/s/4ee687d408c82955bf97c7b5/checkout"
+  },
+  {
+    "at": "2026-11-04T14:44:25.276Z",
+    "kind": "request",
+    "method": "GET",
+    "url": "http://store.proofops.test/s/4ee687d408c82955bf97c7b5/cart"
+  }
+]

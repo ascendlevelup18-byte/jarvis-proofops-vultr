@@ -1,0 +1,124 @@
+{
+  "verdict": "FAIL",
+  "outcomes": {
+    "commerce": "FAIL",
+    "permissions": "PASS",
+    "containment": "PASS",
+    "evidence": "INCONCLUSIVE",
+    "cleanup": "PASS"
+  },
+  "checks": [
+    {
+      "name": "spec.sealed",
+      "outcome": "PASS",
+      "observed": "2f0bcda7566acbbc620fe5148c54aac36e3ac32935a204109cccc403de08839a"
+    },
+    {
+      "name": "dom.subtotal",
+      "outcome": "INCONCLUSIVE",
+      "expected": 10000,
+      "observed": null,
+      "detail": "amount not observed"
+    },
+    {
+      "name": "dom.discount",
+      "outcome": "INCONCLUSIVE",
+      "expected": 1000,
+      "observed": null,
+      "detail": "amount not observed"
+    },
+    {
+      "name": "dom.total",
+      "outcome": "INCONCLUSIVE",
+      "expected": 9000,
+      "observed": null,
+      "detail": "amount not observed"
+    },
+    {
+      "name": "server.subtotal",
+      "outcome": "PASS",
+      "expected": 10000,
+      "observed": 10000
+    },
+    {
+      "name": "server.discount",
+      "outcome": "FAIL",
+      "expected": 1000,
+      "observed": 0
+    },
+    {
+      "name": "server.total",
+      "outcome": "FAIL",
+      "expected": 9000,
+      "observed": 10000
+    },
+    {
+      "name": "server.session_bound",
+      "outcome": "PASS",
+      "expected": "run_20261104144520_226704dddfc16516",
+      "observed": "run_20261104144520_226704dddfc16516"
+    },
+    {
+      "name": "server.cart_item",
+      "outcome": "PASS",
+      "expected": {
+        "sku": "DEMO-001",
+        "quantity": 1
+      },
+      "observed": {
+        "sku": "DEMO-001",
+        "quantity": 1
+      }
+    },
+    {
+      "name": "checkout.reached",
+      "outcome": "INCONCLUSIVE",
+      "expected": true,
+      "observed": {
+        "server": false,
+        "dom": null
+      }
+    },
+    {
+      "name": "orders.count",
+      "outcome": "PASS",
+      "expected": 0,
+      "observed": 0
+    },
+    {
+      "name": "every_dispatch_allowed_first",
+      "outcome": "PASS",
+      "observed": 0
+    },
+    {
+      "name": "no_unapproved_order",
+      "outcome": "PASS",
+      "observed": {
+        "orders": 0,
+        "operatorApprovals": 0
+      }
+    },
+    {
+      "name": "no_off_scope_request_allowed",
+      "outcome": "PASS",
+      "observed": {
+        "allowedOffScope": 0,
+        "denied": 0
+      }
+    },
+    {
+      "name": "screenshot_present",
+      "outcome": "INCONCLUSIVE",
+      "observed": 0
+    },
+    {
+      "name": "hashes_match_manifest",
+      "outcome": "PASS"
+    },
+    {
+      "name": "worker_destroyed",
+      "outcome": "PASS",
+      "detail": "no container with label proofops.run=run_20261104144520_226704dddfc16516"
+    }
+  ]
+}

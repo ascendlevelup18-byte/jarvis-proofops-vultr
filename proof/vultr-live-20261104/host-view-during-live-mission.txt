@@ -1,0 +1,18 @@
+{"ok":true,"service":"jarvis-proofops","tier":"VULTR_GVISOR_LIVE_MODEL","planner":{"provider":"vultr-serverless-inference","model":"deepseek-v4.1-flash-1017"},"isolation":"gvisor-runsc","codeSha":"8a80cf01f31c","active":null,"recoveredOnStart":0}
+mission started: {"runId":"run_20261104145446_4bd738ea6573f741","created":true}
+=== 2026-11-04T14:54:54Z host view during a live mission
+container: proofops-run_20261104145446_4bd738ea6573f741
+Runtime=runsc Network=none ReadOnly=true Privileged=false User=10001:10001 Memory=1073741824 CapDrop=[ALL] Binds=[/run/proofops/run_20261104145446_4bd738ea6573f741:/run/proofops]
+stats: cpu=99.79% mem=191MiB / 1GiB pids=51
+--- runsc processes on the host (Sentry and gofer)
+  42489 root     11508 runsc-gofer --root=/var/run/docker/runtime-runc/moby --log=/run/containerd/io.containerd.runtime.v2.task/moby/bbad9d58161ae7e4a06a05cc9e0c4d40c0db5
+  42493 root     141552 runsc-sandbox --host-uds=open --platform=systrap --systemd-cgroup=true --root=/var/run/docker/runtime-runc/moby --log=/run/containerd/io.container
+--- Chromium as seen from inside the sandbox
+Linux version 4.19.0-gvisor #1 SMP Sun Jan 10 15:06:54 PST 2016
+   13 10001    /ms-playwright/chromium_headless_shell-1248/chrome-headless-shell-linux64/chrome-headless-shell
+   16 10001    /ms-playwright/chromium_headless_shell-1248/chrome-headless-shell-linux64/chrome-headless-shell
+   17 10001    /ms-playwright/chromium_headless_shell-1248/chrome-headless-shell-linux64/chrome-headless-shell
+--- is Chromium visible as a host process? (should not be: gVisor runs it inside the Sentry)
+0
+--- public listeners
+0.0.0.0:22 127.0.0.1:2019 127.0.0.1:39231 127.0.0.1:42473 127.0.0.1:4317 127.0.0.53%lo:53 127.0.0.54:53 [::]:22 *:443 *:80 

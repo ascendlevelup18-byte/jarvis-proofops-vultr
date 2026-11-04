@@ -1,0 +1,20 @@
+{
+  "epoch": 6,
+  "url": "http://store.proofops.test/s/0f0e59a7a40a125d76f82d0c/checkout/submit",
+  "title": "Order placed · Synthetic Store",
+  "text": "ShopCart Synthetic test store for JARVIS ProofOps. No real products, payments or customers. Synthetic order SYN-F230382C placed",
+  "elements": [
+    {
+      "ref": "e1",
+      "tag": "a",
+      "text": "Shop",
+      "href": "http://store.proofops.test/s/0f0e59a7a40a125d76f82d0c/checkout/"
+    },
+    {
+      "ref": "e2",
+      "tag": "a",
+      "text": "Cart",
+      "href": "http://store.proofops.test/s/0f0e59a7a40a125d76f82d0c/checkout/cart"
+    }
+  ]
+}

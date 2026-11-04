@@ -9,10 +9,10 @@ Entry for the Vultr: Agent Rush Hackathon 2026 (lablab.ai), Challenge 1 "Blast R
 |---|---|
 | Local, scripted planner, real Chromium (not isolated) | Working: `npm run proofops:release` passes every local gate |
 | Vultr VM, gVisor sandbox, real Chromium, **scripted planner** | Working: 24/24 boundary checks and all six missions. See [proof/vultr-20261104](proof/vultr-20261104/README.md) |
-| Public demo | https://45-63-82-115.sslip.io runs that same tier, and the header says the planner is scripted |
-| Live Vultr Serverless Inference model | Not yet run (integration tested against a local mock only) |
+| Vultr VM, gVisor sandbox, real Chromium, **live model** | Working: all six missions with `deepseek-v4.1-flash-1017` on Vultr Serverless Inference. See [proof/vultr-live-20261104](proof/vultr-live-20261104/README.md) |
+| Public demo | https://45-63-82-115.sslip.io runs the live-model tier, and the header names the model |
 
-Local results are never presented as Vultr or live-model evidence. Every evidence bundle records its tier.
+Local and scripted results are never presented as live-model evidence. Every evidence bundle records its tier.
 
 ## Run it locally
 Requires Node 24. Install Playwright's Chromium once: `cd apps/proofops/worker && npm ci && npx playwright install chromium`.

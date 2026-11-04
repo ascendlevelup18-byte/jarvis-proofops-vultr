@@ -1,0 +1,15 @@
+{
+  "check": "chat.completions",
+  "at": "2026-11-04T14:27:56.890Z",
+  "provider": "Vultr Serverless Inference",
+  "baseUrl": "https://api.vultrinference.com/v1",
+  "requestedModel": "deepseek-v4.1-flash-1017",
+  "httpStatus": 401,
+  "latencyMs": 274,
+  "requestId": null,
+  "responseModel": null,
+  "responseId": null,
+  "usage": null,
+  "content": null,
+  "error": "authentication failed"
+}

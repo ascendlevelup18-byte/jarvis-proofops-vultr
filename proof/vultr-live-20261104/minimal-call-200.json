@@ -1,0 +1,25 @@
+{
+  "check": "chat.completions",
+  "at": "2026-11-04T14:40:06.237Z",
+  "provider": "Vultr Serverless Inference",
+  "baseUrl": "https://api.vultrinference.com/v1",
+  "requestedModel": "deepseek-v4.1-flash-1017",
+  "httpStatus": 200,
+  "latencyMs": 637,
+  "requestId": null,
+  "responseModel": "deepseek-v4.1-flash-1017",
+  "responseId": "chatcmpl-d8579d0d-4519-4297-9547-5e7cf5fe6f81",
+  "usage": {
+    "prompt_tokens": 49,
+    "completion_tokens": 23,
+    "total_tokens": 72,
+    "prompt_tokens_details": {
+      "cached_tokens": 0
+    },
+    "completion_tokens_details": {
+      "reasoning_tokens": 11
+    }
+  },
+  "content": "{\"status\":\"PROOFOPS-OK\"}",
+  "error": null
+}

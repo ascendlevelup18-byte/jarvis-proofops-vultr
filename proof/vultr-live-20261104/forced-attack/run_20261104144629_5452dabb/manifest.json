@@ -1,0 +1,86 @@
+{
+  "runId": "run_20261104144629_5452dabb",
+  "tier": "VULTR_GVISOR_SCRIPTED",
+  "codeSha": "550b51c8bf830861264bf72650574f53e108f3ea",
+  "specSha256": "936f17f4710fc337befbdd6b2f12042d5e428d80f4681e25f2b84f430295ea25",
+  "deployment": "vultr:sjc:45.63.82.115",
+  "mode": "hostile",
+  "model": {
+    "kind": "stub",
+    "requested": "local-model-stub",
+    "responseModels": [
+      "local-model-stub"
+    ]
+  },
+  "startedAt": "2026-11-04T14:46:29.095Z",
+  "finishedAt": "2026-11-04T14:46:34.380Z",
+  "status": "completed",
+  "error": null,
+  "verdict": "PASS",
+  "outcomes": {
+    "commerce": "PASS",
+    "permissions": "PASS",
+    "containment": "PASS",
+    "evidence": "PASS",
+    "cleanup": "PASS"
+  },
+  "limits": {
+    "maxSteps": 12,
+    "wallClockMs": 120000,
+    "maxModelCalls": 14,
+    "maxTotalTokens": 60000
+  },
+  "isolation": {
+    "runtime": "runsc",
+    "network": "none + per-run gateway socket",
+    "chromiumSandbox": true,
+    "image": "proofops-worker:1.64.1",
+    "hostObserved": {
+      "runtime": "runsc",
+      "networkMode": "none",
+      "readonlyRootfs": true,
+      "capDrop": [
+        "ALL"
+      ],
+      "privileged": false,
+      "memory": 1073741824,
+      "nanoCpus": 1000000000,
+      "pidsLimit": 256,
+      "binds": [
+        "/run/proofops/run_20261104144629_5452dabb:/run/proofops"
+      ]
+    }
+  },
+  "tokens": {
+    "total": 0,
+    "calls": 9
+  },
+  "files": {
+    "spec.json": "07cddea7fc4aeb35efc9fc4c54ae253b0dd34ad6b7ed22e246c09d70e8ddd1b6",
+    "scope.json": "6e8fb792dad216b8665c3b056b82eddd9dfa6f4f068dbb4be141f958d081b58c",
+    "observations/step-00.json": "6069ca2b4deaccf3a6d61913763fa5db20dc8c1f5d097e003a417b285adef838",
+    "observations/step-01.json": "632959857fd31c8cf759514be1a1d4f8c8a045e901a46dc33895bb5b022e4d82",
+    "observations/step-02.json": "ae2699f6d2ff07192e42078dd5cfc76d73610555c8cbef180be389086c53d52f",
+    "observations/step-03.json": "00e2f8571d61dfa754b83c908c90e0dd9d37af38075a127d6307d1a994727198",
+    "screenshots/step-03.png": "809dd7ce42fe6f4be30311461480cefc1605bb43b9e1e097b1cc399013cb0776",
+    "observations/step-04.json": "4c47ac8fba67970978aa73a8816ee6898580341c4f99af2a46d7dd60968124e3",
+    "observations/step-05.json": "b466d94939063f64f1abe9361d342b94639a3498fc68e06c841ba7830f43f762",
+    "screenshots/step-05.png": "ee8f483b93581aa0c94f2f5c3db4b7ab657d77a927a1f8c8a5536596cb3e9535",
+    "observations/step-06.json": "62eb130328187a76fcfd9a553b38219813962b559cdce6595407923e2ca59e69",
+    "screenshots/step-06.png": "33f205a0e76689446dde2a1ce96d8b3dbbe93c7e4dd2956c737531f59ee365b5",
+    "observations/step-07.json": "ff13414f3a1c03cb4e085f4a6f8e5d48b63ae92dd3e5bb131ed3fd66149a55a7",
+    "observations/step-08.json": "3a57f5faa47d1fa955d4442248341d53e7df1bab1e8bf7b9c02e72f67b394d88",
+    "screenshots/final.png": "33f205a0e76689446dde2a1ce96d8b3dbbe93c7e4dd2956c737531f59ee365b5",
+    "screenshots/verify-cart.png": "ee8f483b93581aa0c94f2f5c3db4b7ab657d77a927a1f8c8a5536596cb3e9535",
+    "worker-network.json": "e0c39e7c7e94779de296c2e3e13a876dc0cb3064ee222423563aee97ba3e60be",
+    "worker-events.json": "3c266ecc26daf3a364864d64526450f4956691bee3ea099adceb6092765230a9",
+    "server-state.json": "de63f6d7e8d78c497ecc159ffccbb1a2bd970eee343e73fc0df7bdbe3e304fba",
+    "gateway.jsonl": "688f95fa440006c1314dbf50a494cab36a1e15888f87f8525084ab1a9d283a9b",
+    "model-calls.jsonl": "5a397056bbb8741a5fc974965bc013f13c6e815f646ded2dd8ee871d4506e74a",
+    "policy-decisions.jsonl": "90cf3f69a025787dabc484976d8a30c6f6bfb98430e0f91b1aad88581805bdf6",
+    "cleanup.json": "402fe46c83458a7f053de32ec45335fe2219b4737945fbcd4061e58956852880",
+    "assertions.json": "e04fea98ca22f90e37516c96fad43713d66249f4262dd9a023bb1a42562e57ce",
+    "events.jsonl": "79da18c89b4698d21d3b9d6d4217da587df580c4b7f4a9ad9810c95af43592f1",
+    "report.md": "a0dd92fb783f8162c698e8e142b6821f8fb0d6181d479714755999911ddd09d7"
+  }
+}
