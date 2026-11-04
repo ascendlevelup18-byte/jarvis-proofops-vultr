@@ -23,7 +23,7 @@ const out = {};
 const tcp = (host, port) => new Promise((r) => { const s = net.connect({ host, port, timeout: 3000 }); s.on("connect", () => { s.destroy(); r("CONNECTED"); }); s.on("error", (e) => r(e.code || e.message)); s.on("timeout", () => { s.destroy(); r("TIMEOUT"); }); });
 const viaGateway = (target, method = "GET") => new Promise((r) => {
   const q = http.request({ socketPath: "/run/proofops/gw.sock", method, path: target, timeout: 5000 }, (res) => { res.resume(); r(res.statusCode); });
-  q.on("error", (e) => r(e.code || e.message)); q.on("timeout", () => { q.destroy(); r("TIMEOUT"); }); q.end(); });
+  q.on("connect", (res, sock) => { sock.destroy(); r(res.statusCode); }); q.on("error", (e) => r(e.code || e.message)); q.on("timeout", () => { q.destroy(); r("TIMEOUT"); }); q.end(); });
 (async () => {
   out.uid = process.getuid(); out.gid = process.getgid();
   out.envKeys = Object.keys(process.env).sort();
