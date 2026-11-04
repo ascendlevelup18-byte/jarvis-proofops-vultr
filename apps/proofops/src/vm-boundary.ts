@@ -128,7 +128,7 @@ const checks = probe ? [
   must("gateway refuses another run's session", probe.gw_other_run === 403, probe.gw_other_run),
   must("gateway refuses CONNECT", probe.gw_connect === 403 || probe.gw_connect === "ECONNRESET", probe.gw_connect),
   must("container removed after exit", leftover === "", leftover || "none"),
-] : [must("probe container ran under runsc", false, { status: res.status, stderr: (res.stderr ?? "").slice(-800) })];
+] : [must("probe container ran under runsc", false, { status: res.status, stderr: (res.stderr ?? "").slice(-800), stdoutHead: stdout.slice(0, 600), stdoutLen: stdout.length })];
 
 const report = { tier: "VULTR_GVISOR", runId, image, at: new Date().toISOString(), durationMs: Date.now() - started, dockerRuntimes: inspectRuntime,
   launchFlags: probeArgs.filter((a) => a.startsWith("--") || a === "-v"), hostObserved: inspected, probe, gatewayDecisions: gwEvents, checks,
