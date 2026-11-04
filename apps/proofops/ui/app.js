@@ -354,8 +354,10 @@ async function decide(kind) {
   $("approve-btn").disabled = $("reject-btn").disabled = true;
   try {
     await api(`/api/runs/${current.runId}/${kind}`, { method: "POST", body: JSON.stringify({ payloadSha256: $("approval").dataset.hash }), headers: { "x-run-token": current.runToken ?? "" } });
-    showApproval(null);
-    setStatus("running");
+    if (current?.running) {
+      showApproval(null);
+      setStatus("running");
+    }
   } catch (e) {
     const why = {
       no_pending_approval: "This approval request has already been answered or has expired. Nothing was signed.",

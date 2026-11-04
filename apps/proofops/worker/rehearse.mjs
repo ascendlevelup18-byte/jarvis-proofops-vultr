@@ -32,10 +32,18 @@ async function mission(title, shotName, expect) {
     await page.locator("#approval:not([hidden])").waitFor({ timeout: 60_000 });
     await page.locator("#approval").scrollIntoViewIfNeeded();
     await page.screenshot({ path: join(out, `${shotName}-approval.png`) });
+    // Hold the approval response until the run has finished: the worst order a slow connection can produce.
+    await page.route("**/approve", async (route) => {
+      const response = await route.fetch();
+      await page.locator(".verdict:not(.pending)").waitFor({ timeout: 60_000 });
+      await route.fulfill({ response });
+    });
     await page.locator("#approve-btn").click();
   }
   await page.locator(".verdict:not(.pending)").waitFor({ timeout: 90_000 });
   await page.locator("#evidence a").first().waitFor({ timeout: 10_000 });
+  await page.unrouteAll({ behavior: "wait" });
+  await page.waitForTimeout(200);
   const verdict = (await page.locator("#verdict").innerText()).replace(/\s+/g, " ");
   const runId = await page.locator("#run-id").innerText();
   const status = await page.locator("#run-status").innerText();
