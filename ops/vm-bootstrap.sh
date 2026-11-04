@@ -1,6 +1,5 @@
 #!/usr/bin/env bash
-# ProofOps VM bootstrap for Ubuntu 24.04 LTS on Vultr. NOT YET RUN: it runs only after the owner approves the VM
-# and the build window has started. It is idempotent and prints what it verified.
+# ProofOps VM bootstrap for Ubuntu 24.04 LTS on Vultr. It is idempotent and prints what it verified.
 # Installs Docker, gVisor (runsc), Node 24 and Caddy; creates service users; enables a default-deny firewall.
 set -euo pipefail
 

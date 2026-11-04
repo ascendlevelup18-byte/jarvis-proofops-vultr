@@ -1,4 +1,4 @@
-# /etc/systemd/system/proofops.service  (installed by ops/deploy-app.sh; NOT YET USED)
+# /etc/systemd/system/proofops.service  (installed by ops/deploy-app.sh)
 [Unit]
 Description=JARVIS ProofOps control plane
 After=network-online.target docker.service

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Deploys ProofOps on a VM already prepared by ops/vm-bootstrap.sh. NOT YET RUN.
+# Deploys ProofOps on a VM already prepared by ops/vm-bootstrap.sh.
 # Usage (as root on the VM): bash deploy-app.sh <git-ref> <stub|model-id> <deployment-label> <hostname>
 # "stub" runs the scripted planner (recorded as VULTR_GVISOR_SCRIPTED); a model id needs the inference key installed.
 # Idempotent: re-running updates the code, rebuilds the worker image and restarts the service.

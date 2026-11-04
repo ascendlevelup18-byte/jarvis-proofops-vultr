@@ -1,6 +1,6 @@
 # Real Vultr evidence, 4 Nov 2026
 
-**Where:** Vultr High Performance VM, 4 vCPU / 8 GB, Silicon Valley, Ubuntu 24.04. Host identity was pinned to the fingerprint the owner supplied from the Vultr console before the first connection.
+**Where:** Vultr High Performance VM, 4 vCPU / 8 GB, Silicon Valley, Ubuntu 24.04. SSH trusts only the host key fingerprint the owner confirmed and sent before the first connection.
 
 **Tier:** `VULTR_GVISOR_SCRIPTED`. The browser, sandbox, gateway, store, verifier and evidence are real. **The planner is the scripted stub, not a live model.** No live inference has been run yet.
 

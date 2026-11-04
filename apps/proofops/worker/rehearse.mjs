@@ -42,6 +42,7 @@ async function mission(title, shotName, expect) {
   const blocked = await page.locator("#containment li:not(.empty)").allInnerTexts();
   const teardown = await page.locator('#pipeline li[data-stage="teardown"]').getAttribute("class");
   const shots = await page.locator("#thumbs img").count();
+  await page.evaluate(() => window.scrollTo(0, 0)); // a capture taken while scrolled leaves the sticky header over the content
   await page.screenshot({ path: join(out, `${shotName}.png`), fullPage: true });
   const evidence = await (await context.request.get(`${base}/api/runs/${runId}/verify-evidence`)).json();
   const report = await context.request.get(`${base}/api/runs/${runId}/evidence/report.md`);

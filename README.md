@@ -4,11 +4,12 @@ Entry for the Vultr: Agent Rush Hackathon 2026 (lablab.ai), Challenge 1 "Blast R
 
 **AI proposes. Policy authorizes. The browser acts inside a restricted boundary. Independent verification decides. Evidence proves it.**
 
-## Status (3 Nov 2026)
+## Status (4 Nov 2026)
 | Tier | Status |
 |---|---|
 | Local, scripted planner, real Chromium (not isolated) | Working: `npm run proofops:release` passes every local gate |
-| Vultr VM with gVisor sandbox | Not yet run (VM exists; deployment waits on SSH host-key verification) |
+| Vultr VM, gVisor sandbox, real Chromium, **scripted planner** | Working: 24/24 boundary checks and all six missions. See [proof/vultr-20261104](proof/vultr-20261104/README.md) |
+| Public demo | https://45-63-82-115.sslip.io runs that same tier, and the header says the planner is scripted |
 | Live Vultr Serverless Inference model | Not yet run (integration tested against a local mock only) |
 
 Local results are never presented as Vultr or live-model evidence. Every evidence bundle records its tier.
@@ -25,6 +26,14 @@ Missions: correct discount (PASS), wrong discount (FAIL at $95 vs $90), hostile 
 broken checkout (FAIL), approved checkout (one signed, single-use approval; replay refused), hung page (times out,
 worker destroyed). Evidence bundles land in `evidence-local/<run-id>/`; check one with
 `node apps/proofops/src/evidence.ts evidence-local/<run-id> <anchored-manifest-sha256>` (PASS, FAIL, INCOMPLETE or TAMPERED).
+
+## Deploy on a VM
+Needs Ubuntu 24.04 and SSH to a host key you verified yourself. As root on the VM, with the repository at `/opt/proofops/app`:
+```
+bash ops/vm-bootstrap.sh                                             # Docker, gVisor, Node 24, Caddy, firewall, service users
+bash ops/deploy-app.sh <git-ref> stub <deployment-label> <hostname>  # builds the worker image, starts proofops and Caddy
+```
+A model id in place of `stub` runs the live planner and needs the inference key installed first with `ops/set-inference-key.ps1`, which reads it from a hidden prompt. The service refuses to start if the key, `runsc` or the worker image is missing. [ops/DAY1-RUNBOOK.md](ops/DAY1-RUNBOOK.md) has the full sequence, including the gVisor boundary probe.
 
 ## Architecture
 - `apps/proofops/src/server.ts`: control plane and operator API (holds the model key; the worker never does).
