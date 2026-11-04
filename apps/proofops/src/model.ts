@@ -96,7 +96,10 @@ export function vultrPlanner(opts: { apiKey: string; model: string; timeoutMs?: 
         const r = await client.chatCompletions({
           messages: [{ role: "system", content: SYSTEM_PROMPT }, { role: "user", content: userMessage(turn) }],
           temperature: 0,
-          maxTokens: 300,
+          // The catalog lists reasoning support for the planned models. Reasoning tokens count against max_tokens,
+          // so long thinking could leave an empty reply: ask for the least of it, and leave room for the action.
+          maxTokens: 600,
+          extra: { reasoning_effort: "minimal", response_format: { type: "json_object" } },
           signal,
         });
         return {

@@ -66,7 +66,7 @@ If runsc cannot connect to the bind-mounted socket, stop and report. Do not swit
 ## 6. Inference key and check
 1. **Owner:** `powershell -ExecutionPolicy Bypass -File ops\set-inference-key.ps1 -VmHost <ip>`.
 2. **Claude:** `sudo -u proofops node ops/inference-smoke.mjs` lists models (a public route: it does **not** prove the key works). Pick a model that supports tool calling, ideally with vision.
-3. **Claude:** `sudo -u proofops node ops/inference-smoke.mjs <model-id>` makes one 16-token call.
+3. **Claude:** `sudo -u proofops node ops/inference-smoke.mjs <model-id>` makes one small call (at most 64 output tokens) with the same settings the planner uses.
    - **Pass:** HTTP 200, `responseModel` present, usage recorded.
    - A 401, 403 or 429 is reported as-is.
 4. **Owner:** recheck the Billing balance.
@@ -107,5 +107,5 @@ Local runs with a stub model are labelled `LOCAL MODEL STUB` and never count tow
 5. **gVisor gate:** `sudo -u proofops node apps/proofops/src/vm-boundary.ts --out /var/lib/proofops/vm-boundary.json`. All checks must pass (runtime observed by Docker as `runsc`, gVisor in the guest kernel log, network none, no host secrets, gateway refusals). On any failure, stop and keep the report.
 6. **Sandboxed missions, still with the scripted planner:** start `node apps/proofops/src/server.ts --sandbox --port 4317` and run `node apps/proofops/src/smoke.ts`. Tier recorded: `VULTR_GVISOR_SCRIPTED`.
 7. Owner installs the inference key (`ops/set-inference-key.ps1`), after approving the subscription.
-8. `sudo -u proofops node ops/inference-smoke.mjs deepseek-v4.1-flash-1017`: one 16-token call; must return HTTP 200 and a response model.
+8. `sudo -u proofops node ops/inference-smoke.mjs deepseek-v4.1-flash-1017`: one small call; must return HTTP 200 and a response model.
 9. `ops/deploy-app.sh <sha> deepseek-v4.1-flash-1017 vultr:<instance-id> 45-63-82-115.sslip.io`, then run one live-model mission per scenario from the console.

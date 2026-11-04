@@ -37,8 +37,8 @@ if (!model) {
 }
 
 const r = await call("/chat/completions", {
-  model, max_tokens: 16, temperature: 0,
-  messages: [{ role: "user", content: "Reply with exactly: PROOFOPS-OK" }],
+  model, max_tokens: 64, temperature: 0, reasoning_effort: "minimal", response_format: { type: "json_object" },
+  messages: [{ role: "user", content: 'Reply with this JSON object and nothing else: {"status":"PROOFOPS-OK"}' }],
 });
 const out = {
   check: "chat.completions", at, provider: "Vultr Serverless Inference", baseUrl: BASE,

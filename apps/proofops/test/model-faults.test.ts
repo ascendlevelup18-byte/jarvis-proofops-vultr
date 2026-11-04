@@ -10,6 +10,7 @@ import { checkAction, type RunScope } from "../src/policy.ts";
 
 const KEY = "VULTRKEY9f8e7d6c5b4a3210";
 const hits = new Map<string, number>();
+let lastBody: Record<string, unknown> = {};
 let server: Server;
 let base: string;
 
@@ -20,7 +21,8 @@ before(async () => {
   server = createServer(async (req, res) => {
     let body = "";
     for await (const c of req) body += c;
-    const model = (JSON.parse(body || "{}") as { model?: string }).model ?? "";
+    lastBody = JSON.parse(body || "{}") as Record<string, unknown>;
+    const model = (lastBody as { model?: string }).model ?? "";
     hits.set(model, (hits.get(model) ?? 0) + 1);
     const send = (status: number, text: string, type = "application/json") => { res.writeHead(status, { "content-type": type }); res.end(text); };
     switch (model) {
@@ -63,6 +65,14 @@ const outcome = async (model: string, timeoutMs?: number) => {
     : (() => { const d = checkAction(rec.parsed, turn.observation, scope, 0); return d.decision === "allow" ? "allow" : `${d.decision}:${d.rule}`; })();
   return { rec, decision };
 };
+
+test("the planner limits reasoning and asks for JSON, so thinking cannot use up the reply", async () => {
+  await plan("ok-click").next(turn);
+  assert.equal(lastBody.reasoning_effort, "minimal");
+  assert.deepEqual(lastBody.response_format, { type: "json_object" });
+  assert.equal(lastBody.max_tokens, 600);
+  assert.equal(lastBody.temperature, 0);
+});
 
 test("valid proposals (plain or fenced JSON) become typed, policy-checked actions with model attribution", async () => {
   for (const m of ["ok-click", "fenced"]) {
