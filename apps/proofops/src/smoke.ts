@@ -34,7 +34,7 @@ async function runMission(id: string, approve: boolean): Promise<Snap> {
     const s = (await get(`/api/runs/${runId}`)) as Snap;
     if (s.pendingApproval && approve) {
       // Two operators approve at the same moment: exactly one signature may be issued.
-      const both = await Promise.all([0, 1].map(() => post(`/api/runs/${runId}/approve`, { payloadSha256: s.pendingApproval!.payloadSha256 })));
+      const both = await Promise.all([0, 1].map(() => post(`/api/runs/${runId}/approve`, { payloadSha256: s.pendingApproval!.payloadSha256 }, { "x-run-token": start.body.runToken as string })));
       extra.approvals = both.map((b) => b.status).sort();
     }
     if (s.result) {

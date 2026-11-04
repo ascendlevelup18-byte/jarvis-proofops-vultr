@@ -16,7 +16,8 @@ import { verify, type VerifierReport } from "./verifier.ts";
 import { STORE_HOST, type SessionState } from "./storefront.ts";
 import { cartPayloadSha256 } from "./approval.ts";
 
-export type Tier = "LOCAL_MODEL_STUB" | "LOCAL_LIVE_MODEL" | "LIVE_VULTR_SANDBOX";
+/** Evidence tier. Scripted and live-model runs are never merged; the tier is sealed into every manifest. */
+export type Tier = "LOCAL_MODEL_STUB" | "LOCAL_LIVE_MODEL" | "VULTR_GVISOR_SCRIPTED" | "VULTR_GVISOR_LIVE_MODEL";
 
 export interface ApprovalRequest {
   runId: string;
@@ -49,6 +50,8 @@ export interface RunConfig {
   /** External cancellation (operator pressed Cancel). */
   signal?: AbortSignal;
   maxModelCalls?: number;
+  /** Hard per-run token budget, summed from the provider's reported usage. */
+  maxTotalTokens?: number;
 }
 
 export interface StepRecord {
@@ -97,6 +100,7 @@ export async function runScenario(cfg: RunConfig): Promise<RunResult> {
   const maxSteps = cfg.maxSteps ?? 12;
   const deadline = Date.now() + (cfg.wallClockMs ?? 120_000);
   const maxModelCalls = cfg.maxModelCalls ?? 14;
+  const maxTotalTokens = cfg.maxTotalTokens ?? 60_000;
   const dir = join(cfg.evidenceRoot, runId);
   // A run id is used once: never overwrite an earlier run's evidence.
   try {
@@ -176,6 +180,7 @@ export async function runScenario(cfg: RunConfig): Promise<RunResult> {
   let cleanup = { workerGone: null as boolean | null, detail: "not started" };
   let screenshotCount = 0;
   let approvalsGranted = 0;
+  let hostObserved: Record<string, unknown> | null = null;
 
   const shot = async (name: string) => {
     const r = await worker!.call<{ png: string; url: string }>("screenshot", {}, 15_000);
@@ -192,6 +197,14 @@ export async function runScenario(cfg: RunConfig): Promise<RunResult> {
     );
     ev("worker.launched", { kind: worker.kind, container: worker.containerName, args: worker.launchArgs });
     cfg.onWorker?.(worker);
+    // Fail closed: for a sandboxed run, Docker itself must report the requested runtime. Never trust the flag alone.
+    if (cfg.worker.kind === "sandbox") {
+      hostObserved = await worker.inspect();
+      ev("sandbox.host_observed", { ...hostObserved });
+      if (hostObserved?.runtime !== cfg.worker.limits.runtime) {
+        throw new Error(`sandbox_runtime_mismatch: requested ${cfg.worker.limits.runtime}, Docker reports ${String(hostObserved?.runtime)}`);
+      }
+    }
     // Hard stop: on wall-clock expiry or cancellation the worker is destroyed immediately, which fails any
     // in-flight call; the run then records the real stop reason instead of waiting for a step boundary.
     const w = worker;
@@ -209,17 +222,27 @@ export async function runScenario(cfg: RunConfig): Promise<RunResult> {
     ev("worker.started", started);
 
     let consecutiveInvalid = 0;
+    let tokensUsed = 0;
     for (let step = 0; step < maxSteps; step++) {
       if (stopReason) break;
       if (modelCalls.length >= maxModelCalls) { status = "failed"; error = "model call budget exhausted"; break; }
       const obs = await worker.call<Observation>("observe");
       await put(`observations/step-${String(step).padStart(2, "0")}.json`, JSON.stringify(obs, null, 2));
-      const call = await cfg.planner.next({
+      // A planner that ignores the signal cannot hold the run open: the stop wins the race.
+      const stopped = new Promise<ModelCallRecord>((resolve) => {
+        const onStop = () => resolve({ provider: cfg.planner.kind === "vultr" ? "vultr-serverless-inference" : "local-model-stub", requestedModel: cfg.planner.model,
+          responseModel: null, responseId: null, usage: null, latencyMs: 0, rawContent: "", parsed: null, error: "run stopped before the model replied" });
+        if (plannerAbort.signal.aborted) onStop();
+        else plannerAbort.signal.addEventListener("abort", onStop, { once: true });
+      });
+      const call = await Promise.race([cfg.planner.next({
         task: spec.task, allowedPaths: scope.navigablePaths, observation: obs,
         history: steps.map((s) => ({ action: s.proposal, decision: s.policy.decision, rule: s.policy.rule, result: s.result })),
-      }, plannerAbort.signal);
+      }, plannerAbort.signal), stopped]);
       modelCalls.push(call);
       if (stopReason) { ev("model.reply_after_stop_discarded", { step }); break; } // never act on a late reply
+      tokensUsed += call.usage?.totalTokens ?? 0;
+      if (tokensUsed > maxTotalTokens) { status = "failed"; error = `token budget exhausted (${tokensUsed} > ${maxTotalTokens})`; ev("run.token_budget_exhausted", { tokensUsed }); break; }
       const decision = call.error
         ? ({ decision: "deny", rule: "model_error", detail: call.error } as PolicyDecision)
         : call.parsed === null
@@ -316,8 +339,12 @@ export async function runScenario(cfg: RunConfig): Promise<RunResult> {
       dom = { subtotal: totals.values.subtotal ?? null, discount: totals.values.discount ?? null, total: totals.values.total ?? null, checkoutMarker: finalRead.values.marker !== null };
       ev("verifier.dom_read", { cartStatus: cartRead.status, ...dom });
     } catch (e) {
+      // Without the browser read the run cannot be called complete, however good the server state looks.
       ev("verifier.dom_read_failed", { error: (e as Error).message });
+      status = /worker_timeout|Timeout \d+ms exceeded/.test((e as Error).message) ? "timed_out" : "failed";
+      error = error ?? `verification could not read the browser: ${(e as Error).message.slice(0, 120)}`;
     }
+    if (stopReason) throw new Error(stopReason === "timed_out" ? "wall clock limit reached" : "cancelled by operator");
     const netlog = await worker.call<{ entries: unknown[] }>("netlog").catch(() => ({ entries: [] }));
     await put("worker-network.json", JSON.stringify(netlog.entries, null, 2));
   } catch (e) {
@@ -376,22 +403,24 @@ export async function runScenario(cfg: RunConfig): Promise<RunResult> {
   });
   if (status !== "completed" && report.verdict === "PASS") report.verdict = "INCONCLUSIVE"; // a broken run never reports PASS
   await put("assertions.json", JSON.stringify(report, null, 2));
-  await writeFile(join(dir, "events.jsonl"), events.map((e) => JSON.stringify(e)).join("\n"));
 
   const isolation = cfg.worker.kind === "sandbox"
-    ? { runtime: cfg.worker.limits.runtime, network: "none + per-run gateway socket", chromiumSandbox: !cfg.worker.limits.chromiumNoSandbox, image: cfg.worker.limits.image }
+    ? { runtime: cfg.worker.limits.runtime, network: "none + per-run gateway socket", chromiumSandbox: !cfg.worker.limits.chromiumNoSandbox, image: cfg.worker.limits.image, hostObserved }
     : { runtime: "none (LOCAL: plain child process, NOT isolated)", network: "proxy to per-run gateway on loopback", chromiumSandbox: true, image: null };
-  const manifest = {
+  const meta = {
     runId, tier: cfg.tier, codeSha: cfg.codeSha, specSha256: spec.specSha256, deployment: cfg.deployment, mode: cfg.mode,
     model: { kind: cfg.planner.kind, requested: cfg.planner.model, responseModels: [...new Set(modelCalls.map((m) => m.responseModel).filter(Boolean))] },
     startedAt: events[0]?.at, finishedAt: new Date().toISOString(), status, error, verdict: report.verdict, outcomes: report.outcomes,
-    limits: { maxSteps, wallClockMs: cfg.wallClockMs ?? 120_000, maxModelCalls }, isolation,
-    files,
+    limits: { maxSteps, wallClockMs: cfg.wallClockMs ?? 120_000, maxModelCalls, maxTotalTokens }, isolation,
+    tokens: { total: modelCalls.reduce((n, m) => n + (m.usage?.totalTokens ?? 0), 0), calls: modelCalls.length },
   };
+  // The report and event log are what people read, so they are sealed too.
+  await put("events.jsonl", events.map((e) => JSON.stringify(e)).join("\n"));
+  await put("report.md", renderReport(meta, report, steps, spec));
+  const manifest = { ...meta, files };
   const manifestText = JSON.stringify(manifest, null, 2);
   await writeFile(join(dir, "manifest.json"), manifestText);
   const manifestSha256 = sha256(manifestText);
-  await writeFile(join(dir, "report.md"), renderReport(manifest, report, steps, spec));
   return { runId, status, verdict: report.verdict, report, evidenceDir: dir, steps: steps.length, error, manifestSha256 };
 }
 

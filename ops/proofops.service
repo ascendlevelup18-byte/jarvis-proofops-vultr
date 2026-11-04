@@ -8,11 +8,18 @@ Requires=docker.service
 User=proofops
 Group=proofops
 WorkingDirectory=/opt/proofops/app
-# Model id and deployment label come from /etc/proofops/control.env (no secrets in this unit file).
+# Planner, model and deployment label come from /etc/proofops/control.env (no secrets in this unit file).
 EnvironmentFile=/etc/proofops/control.env
 Environment=PROOFOPS_HOST=127.0.0.1
 Environment=PROOFOPS_INFERENCE_ENV_FILE=/etc/proofops/inference.env
-ExecStart=/usr/bin/node apps/proofops/src/server.ts --sandbox --planner vultr --model ${PROOFOPS_MODEL} --port 4317 --deployment ${PROOFOPS_DEPLOYMENT} --evidence /var/lib/proofops/evidence --data /var/lib/proofops/data
+Environment=HOME=/var/lib/proofops
+# Public demo limits: Caddy sets X-Forwarded-For; per-client and daily caps bound load and model spend.
+Environment=PROOFOPS_TRUST_PROXY=1
+Environment=PROOFOPS_RUNS_PER_MIN=6
+Environment=PROOFOPS_MAX_RUNS_PER_DAY=150
+Environment=PROOFOPS_EVIDENCE_KEEP=300
+# Refuses to start without runsc, the worker image, or (live planner) the key: it never falls back silently.
+ExecStart=/usr/local/bin/node apps/proofops/src/server.ts --sandbox --port 4317 --deployment ${PROOFOPS_DEPLOYMENT} --evidence /var/lib/proofops/evidence --data /var/lib/proofops/data
 # /run/proofops holds the per-run gateway sockets; recreated on each start, so stale sockets never survive.
 RuntimeDirectory=proofops
 RuntimeDirectoryMode=0711

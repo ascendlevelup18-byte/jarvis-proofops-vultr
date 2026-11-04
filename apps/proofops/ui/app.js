@@ -25,7 +25,7 @@ async function loadHealth() {
   try {
     const h = await api("/api/health");
     const add = (text, cls, title) => { const c = el("li", `chip ${cls}`, text); if (title) c.title = title; env.append(c); };
-    const live = h.tier === "LIVE_VULTR_SANDBOX";
+    const live = h.tier.startsWith("VULTR_GVISOR");
     add(h.planner.provider === "vultr-serverless-inference" ? `Model: ${h.planner.model} (Vultr Serverless Inference)` : "Model: scripted stub (local)",
       h.planner.provider === "vultr-serverless-inference" ? "ok" : "warn", "Which planner proposes actions in this deployment");
     add(live ? "Sandbox: gVisor (runsc)" : "Sandbox: none (local development)", live ? "ok" : "warn", "Browser worker isolation in this deployment");
@@ -77,7 +77,7 @@ async function loadHistory() {
     ol.replaceChildren();
     for (const r of rows.slice(0, 8)) {
       const li = el("li");
-      const sc = el("span", "mono", r.id.slice(-8));
+      const sc = el("span", "mono", r.ref);
       const v = el("span", `badge ${r.verdict === "PASS" ? "allow" : r.verdict ? "deny" : "gw"}`, r.verdict ?? r.status);
       li.append(el("span", "", r.mode), sc, v);
       ol.append(li);
@@ -285,14 +285,16 @@ async function startRun() {
   $("run-error").hidden = true;
   $("run-btn").disabled = true;
   try {
-    const { runId } = await api("/api/runs", { method: "POST", body: JSON.stringify({ scenario: selected.id }), headers: { "idempotency-key": crypto.randomUUID() } });
-    current = { runId, running: true };
+    const { runId, runToken } = await api("/api/runs", { method: "POST", body: JSON.stringify({ scenario: selected.id }), headers: { "idempotency-key": crypto.randomUUID() } });
+    current = { runId, running: true, runToken };
+    try { sessionStorage.setItem("proofops.run", JSON.stringify({ runId, runToken, scenarioId: selected.id })); } catch { /* optional */ }
     resetRunView(selected, runId);
     setStatus("running");
     $("main").focus();
     follow(runId);
   } catch (e) {
     $("run-error").textContent = e.status === 409 ? "Another mission is still running. Wait for it to finish."
+      : e.message === "daily_limit" ? "This demo has reached its daily mission limit. Please try again tomorrow."
       : e.status === 429 ? "Too many runs from this address in the last minute. Try again shortly."
       : e instanceof TypeError ? "The control plane is not reachable. Check that it is running."
       : `Could not start the mission (${e.message}).`;
@@ -336,7 +338,7 @@ async function decide(kind) {
   if (!current) return;
   $("approve-btn").disabled = $("reject-btn").disabled = true;
   try {
-    await api(`/api/runs/${current.runId}/${kind}`, { method: "POST", body: JSON.stringify({ payloadSha256: $("approval").dataset.hash }) });
+    await api(`/api/runs/${current.runId}/${kind}`, { method: "POST", body: JSON.stringify({ payloadSha256: $("approval").dataset.hash }), headers: { "x-run-token": current.runToken ?? "" } });
     showApproval(null);
     setStatus("running");
   } catch (e) {
@@ -344,6 +346,7 @@ async function decide(kind) {
       no_pending_approval: "This approval request has already been answered or has expired. Nothing was signed.",
       approval_payload_changed: "The cart changed after this request was shown. Nothing was signed; the agent must ask again.",
       missing_ui_header: "The request did not come from this console, so it was refused.",
+      not_run_owner: "Only the browser that started this mission can approve it. Nothing was signed.",
     }[e.message];
     $("run-error").textContent = why ?? `Approval could not be recorded (${e.message}). Nothing was signed.`;
     $("run-error").hidden = false;
@@ -355,7 +358,7 @@ async function decide(kind) {
 $("run-btn").addEventListener("click", startRun);
 $("approve-btn").addEventListener("click", () => decide("approve"));
 $("reject-btn").addEventListener("click", () => decide("reject"));
-$("cancel-btn").addEventListener("click", async () => { if (current) await api(`/api/runs/${current.runId}/cancel`, { method: "POST", body: "{}" }).catch(() => {}); });
+$("cancel-btn").addEventListener("click", async () => { if (current) await api(`/api/runs/${current.runId}/cancel`, { method: "POST", body: "{}", headers: { "x-run-token": current.runToken ?? "" } }).catch(() => {}); });
 
 (async () => {
   await loadHealth();
@@ -364,4 +367,20 @@ $("cancel-btn").addEventListener("click", async () => { if (current) await api(`
   renderScenarios();
   $("run-btn").disabled = !selected;
   loadHistory();
+  // A reload mid-mission reconnects to the same run; it never starts or repeats anything.
+  try {
+    const saved = JSON.parse(sessionStorage.getItem("proofops.run") ?? "null");
+    if (saved?.runId) {
+      const snap = await api(`/api/runs/${saved.runId}`);
+      const scenario = scenarios.find((s) => s.id === saved.scenarioId);
+      if (snap.events && scenario) {
+        selectScenario(scenario);
+        current = { runId: saved.runId, running: !snap.result, runToken: saved.runToken };
+        resetRunView(scenario, saved.runId);
+        setStatus(snap.status);
+        follow(saved.runId);
+        $("run-btn").disabled = current.running;
+      }
+    }
+  } catch { /* nothing to reconnect to */ }
 })();

@@ -7,7 +7,7 @@ import { readFileSync, mkdirSync, existsSync } from "node:fs";
 import { execFileSync } from "node:child_process";
 import { join, normalize, extname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { randomBytes } from "node:crypto";
+import { randomBytes, timingSafeEqual } from "node:crypto";
 import type { AddressInfo } from "node:net";
 import { createStorefront } from "./storefront.ts";
 import { startSigner } from "./signer.ts";
@@ -15,7 +15,7 @@ import { stubPlanner, vultrPlanner, type Planner } from "./model.ts";
 import { runScenario, type ApprovalRequest, type RunConfig, type Tier } from "./runner.ts";
 import { SCENARIOS, findScenario, type Scenario } from "./scenarios.ts";
 import { RunStore } from "./store.ts";
-import { classifyEvidence } from "./evidence.ts";
+import { classifyEvidence, pruneEvidence } from "./evidence.ts";
 
 const arg = (name: string, fallback?: string) => {
   const i = process.argv.indexOf(`--${name}`);
@@ -26,8 +26,12 @@ const UI_DIR = join(ROOT, "apps", "proofops", "ui");
 const PORT = Number(arg("port", process.env.PROOFOPS_PORT ?? "4317"));
 const HOST = process.env.PROOFOPS_HOST ?? "127.0.0.1";
 const SANDBOX = process.argv.includes("--sandbox");
-const PLANNER = arg("planner", "stub")!;
-const MODEL = arg("model");
+const PLANNER = arg("planner", process.env.PROOFOPS_PLANNER ?? "stub")!;
+const MODEL = arg("model", process.env.PROOFOPS_MODEL);
+const TRUST_PROXY = process.env.PROOFOPS_TRUST_PROXY === "1"; // only behind our own Caddy, which sets X-Forwarded-For
+const MAX_RUNS_PER_DAY = Math.max(Number(process.env.PROOFOPS_MAX_RUNS_PER_DAY ?? "200") || 200, 1);
+const EVIDENCE_KEEP = Math.max(Number(process.env.PROOFOPS_EVIDENCE_KEEP ?? "300") || 300, 10);
+const MAX_LISTENERS = 50;
 const EVIDENCE_ROOT = resolve(ROOT, arg("evidence", SANDBOX ? "evidence" : "evidence-local")!);
 const DATA_DIR = resolve(ROOT, arg("data", "data-local")!);
 mkdirSync(EVIDENCE_ROOT, { recursive: true });
@@ -48,17 +52,29 @@ const storefront = {
 const registry = new RunStore(join(DATA_DIR, "runs.db"));
 const recovered = registry.recoverInterrupted();
 
-function makePlanner(scenario: Scenario): Planner {
-  if (PLANNER === "vultr") {
-    const envFile = process.env.PROOFOPS_INFERENCE_ENV_FILE ?? "/etc/proofops/inference.env";
-    const key = /^PROOFOPS_INFERENCE_API_KEY=(.+)$/m.exec(readFileSync(envFile, "utf8"))?.[1]?.trim();
-    if (!key || !MODEL) throw new Error("vultr planner needs --model and a key file");
-    return vultrPlanner({ apiKey: key, model: MODEL });
-  }
-  void scenario;
-  return stubPlanner();
+// Fail closed at startup, not mid-run: no key, no live planner; no runsc or worker image, no sandboxed server.
+function die(message: string): never {
+  console.error(`ProofOps refused to start: ${message}`);
+  process.exit(1);
 }
-const TIER: Tier = SANDBOX ? "LIVE_VULTR_SANDBOX" : PLANNER === "vultr" ? "LOCAL_LIVE_MODEL" : "LOCAL_MODEL_STUB";
+let inferenceKey = "";
+if (PLANNER === "vultr") {
+  const envFile = process.env.PROOFOPS_INFERENCE_ENV_FILE ?? "/etc/proofops/inference.env";
+  try { inferenceKey = /^PROOFOPS_INFERENCE_API_KEY=(.+)$/m.exec(readFileSync(envFile, "utf8"))?.[1]?.trim() ?? ""; } catch { /* reported below */ }
+  if (!inferenceKey) die(`no inference key in ${envFile}`);
+  if (!MODEL) die("--model is required with the vultr planner");
+} else if (PLANNER !== "stub") die(`unknown planner ${PLANNER}`);
+const IMAGE = arg("image", "proofops-worker:1.64.1")!;
+const NO_CHROMIUM_SANDBOX = process.argv.includes("--chromium-no-sandbox") || process.env.PROOFOPS_CHROMIUM_NO_SANDBOX === "1";
+if (SANDBOX) {
+  try {
+    const runtimes = execFileSync("docker", ["info", "--format", "{{json .Runtimes}}"], { encoding: "utf8" });
+    if (!/"runsc"/.test(runtimes)) die("Docker has no runsc runtime; refusing to run without gVisor");
+    execFileSync("docker", ["image", "inspect", IMAGE], { stdio: "ignore" });
+  } catch (e) { die(`sandbox prerequisites missing: ${(e as Error).message.split("\n")[0]}`); }
+}
+const makePlanner = (): Planner => (PLANNER === "vultr" ? vultrPlanner({ apiKey: inferenceKey, model: MODEL! }) : stubPlanner());
+const TIER: Tier = SANDBOX ? (PLANNER === "vultr" ? "VULTR_GVISOR_LIVE_MODEL" : "VULTR_GVISOR_SCRIPTED") : PLANNER === "vultr" ? "LOCAL_LIVE_MODEL" : "LOCAL_MODEL_STUB";
 
 // ---- Live run state (one mission at a time keeps the demo VM predictable) ----
 interface Live {
@@ -71,6 +87,8 @@ interface Live {
   abort: AbortController;
   result: Record<string, unknown> | null;
   listeners: Set<ServerResponse>;
+  /** Capability returned only to the browser that started the run; required to approve, reject or cancel it. */
+  ownerToken: string;
 }
 let active: Live | null = null;
 const finished = new Map<string, Live>();
@@ -88,18 +106,18 @@ function snapshot(l: Live) {
   };
 }
 
-async function startRun(scenario: Scenario, idempotencyKey: string | null): Promise<{ runId: string; created: boolean }> {
-  const runId = `run_${new Date().toISOString().replace(/[-:.TZ]/g, "").slice(0, 14)}_${randomBytes(4).toString("hex")}`;
+async function startRun(scenario: Scenario, idempotencyKey: string | null): Promise<{ runId: string; created: boolean; runToken?: string }> {
+  const runId = `run_${new Date().toISOString().replace(/[-:.TZ]/g, "").slice(0, 14)}_${randomBytes(8).toString("hex")}`;
   const reg = registry.create({ id: runId, idempotencyKey, mode: scenario.mode, tier: TIER });
   if (!reg.created) return { runId: reg.run.id, created: false };
   registry.update(runId, { status: "running" });
-  const live: Live = { runId, scenario, status: "running", events: [], steps: [], pendingApproval: null, abort: new AbortController(), result: null, listeners: new Set() };
+  const live: Live = { runId, scenario, status: "running", events: [], steps: [], pendingApproval: null, abort: new AbortController(), result: null, listeners: new Set(), ownerToken: randomBytes(24).toString("hex") };
   active = live;
   const cfg: RunConfig = {
     runId, mode: scenario.mode, task: scenario.task, ordersExpected: scenario.ordersExpected,
-    planner: makePlanner(scenario), tier: TIER, storefront,
+    planner: makePlanner(), tier: TIER, storefront,
     worker: SANDBOX
-      ? { kind: "sandbox", socketRoot: "/run/proofops", limits: { image: arg("image", "proofops-worker:1.64.1")!, runtime: "runsc", memoryMb: 1024, cpus: 1, pids: 256, chromiumNoSandbox: process.argv.includes("--chromium-no-sandbox") } }
+      ? { kind: "sandbox", socketRoot: "/run/proofops", limits: { image: IMAGE, runtime: "runsc", memoryMb: 1024, cpus: 1, pids: 256, chromiumNoSandbox: NO_CHROMIUM_SANDBOX } }
       : { kind: "local" },
     evidenceRoot: EVIDENCE_ROOT, codeSha, deployment: arg("deployment", SANDBOX ? "vultr" : "local")!,
     wallClockMs: scenario.wallClockMs, signal: live.abort.signal,
@@ -134,9 +152,11 @@ async function startRun(scenario: Scenario, idempotencyKey: string | null): Prom
       for (const res of live.listeners) res.end();
       live.listeners.clear();
       finished.set(runId, live);
+      for (const old of [...finished.keys()].slice(0, Math.max(0, finished.size - 50))) finished.delete(old); // bounded memory
+      try { pruneEvidence(EVIDENCE_ROOT, EVIDENCE_KEEP); } catch { /* retention must never break a run */ }
       if (active === live) active = null;
     });
-  return { runId, created: true };
+  return { runId, created: true, runToken: live.ownerToken };
 }
 
 // ---- HTTP ----
@@ -159,9 +179,16 @@ async function readJson(req: IncomingMessage): Promise<Record<string, unknown>> 
 const sameOrigin = (req: IncomingMessage) => req.headers["x-proofops"] === "1";
 const RUNS_PER_MINUTE = Math.min(Math.max(Number(process.env.PROOFOPS_RUNS_PER_MIN ?? "10") || 10, 1), 120);
 const perIp = new Map<string, number[]>();
+// Behind Caddy every socket comes from 127.0.0.1, so the client address must come from the header Caddy sets.
+// Only honoured when configured: otherwise anyone could spoof the header to dodge the limit.
+const clientIp = (req: IncomingMessage) => {
+  const xff = TRUST_PROXY ? req.headers["x-forwarded-for"] : undefined;
+  return (typeof xff === "string" ? xff.split(",").at(-1)?.trim() : null) || (req.socket.remoteAddress ?? "?");
+};
 function rateLimited(req: IncomingMessage): boolean {
-  const ip = req.socket.remoteAddress ?? "?";
+  const ip = clientIp(req);
   const now = Date.now();
+  if (perIp.size > 5_000) perIp.clear(); // bounded memory under address spraying
   const hits = (perIp.get(ip) ?? []).filter((t) => now - t < 60_000);
   hits.push(now);
   perIp.set(ip, hits);
@@ -180,6 +207,12 @@ async function serveFile(res: ServerResponse, base: string, rel: string) {
   }
 }
 
+const ownerOk = (req: IncomingMessage, live: Live | undefined | null) => {
+  const given = Buffer.from(String(req.headers["x-run-token"] ?? ""));
+  const want = Buffer.from(live?.ownerToken ?? "");
+  return want.length > 0 && given.length === want.length && timingSafeEqual(given, want);
+};
+
 const server = createServer(async (req, res) => {
   try {
     const url = new URL(req.url ?? "/", "http://ui.local");
@@ -189,25 +222,31 @@ const server = createServer(async (req, res) => {
         isolation: SANDBOX ? "gvisor-runsc" : "none (local development)", codeSha: codeSha.slice(0, 12), active: active?.runId ?? null, recoveredOnStart: recovered });
     }
     if (req.method === "GET" && p === "/api/scenarios") return json(res, 200, SCENARIOS);
-    if (req.method === "GET" && p === "/api/runs") return json(res, 200, registry.list(30));
+    // Public history: outcomes only. Full run ids are capabilities for evidence, and paths never leave the server.
+    if (req.method === "GET" && p === "/api/runs") {
+      return json(res, 200, registry.list(30).map((r) => ({ ref: r.id.slice(-8), mode: r.mode, tier: r.tier, status: r.status, verdict: r.verdict, at: r.created_at })));
+    }
     if (req.method === "POST" && p === "/api/runs") {
       if (!sameOrigin(req)) return json(res, 403, { error: "missing_ui_header" });
       if (rateLimited(req)) return json(res, 429, { error: "rate_limited" });
       const body = await readJson(req);
       const scenario = findScenario(String(body.scenario ?? ""));
       if (!scenario) return json(res, 400, { error: "unknown_scenario" });
-      if (active) return json(res, 409, { error: "busy", activeRunId: active.runId });
+      if (active) return json(res, 409, { error: "busy" });
+      // Global budget (also caps model spend: at most 14 calls and 60k tokens per run).
+      if (registry.countSince(new Date(Date.now() - 86_400_000).toISOString()) >= MAX_RUNS_PER_DAY) return json(res, 429, { error: "daily_limit" });
       const key = typeof req.headers["idempotency-key"] === "string" ? req.headers["idempotency-key"].slice(0, 128) : null;
       return json(res, 202, await startRun(scenario, key));
     }
-    const m = /^\/api\/runs\/(run_[0-9]{14}_[0-9a-f]{8})(\/.*)?$/.exec(p);
+    const m = /^\/api\/runs\/(run_[0-9]{14}_[0-9a-f]{8,16})(\/.*)?$/.exec(p);
     if (m) {
       const id = m[1]!;
       const sub = m[2] ?? "";
       const live = active?.runId === id ? active : finished.get(id);
-      if (req.method === "GET" && sub === "") return live ? json(res, 200, snapshot(live)) : registry.get(id) ? json(res, 200, { runId: id, row: registry.get(id) }) : json(res, 404, { error: "not_found" });
+      if (req.method === "GET" && sub === "") return live ? json(res, 200, snapshot(live)) : registry.get(id) ? json(res, 200, { runId: id, status: registry.get(id)!.status, verdict: registry.get(id)!.verdict }) : json(res, 404, { error: "not_found" });
       if (req.method === "GET" && sub === "/stream") {
         if (!live) return json(res, 404, { error: "not_found" });
+        if (live.listeners.size >= MAX_LISTENERS) return json(res, 503, { error: "too_many_viewers" });
         res.writeHead(200, { "content-type": "text/event-stream", "cache-control": "no-store", connection: "keep-alive", ...SECURITY_HEADERS });
         res.write(`event: snapshot\ndata: ${JSON.stringify(snapshot(live))}\n\n`);
         if (live !== active) { res.write(`event: done\ndata: ${JSON.stringify(snapshot(live))}\n\n`); return res.end(); }
@@ -217,6 +256,7 @@ const server = createServer(async (req, res) => {
       }
       if (req.method === "POST" && (sub === "/approve" || sub === "/reject")) {
         if (!sameOrigin(req)) return json(res, 403, { error: "missing_ui_header" });
+        if (!ownerOk(req, live)) return json(res, 403, { error: "not_run_owner" });
         const body = await readJson(req);
         // Claim the pending request synchronously (no await in between), so two simultaneous decisions can never
         // both reach the signer: the first claims it, every other caller sees nothing pending.
@@ -236,6 +276,7 @@ const server = createServer(async (req, res) => {
       }
       if (req.method === "POST" && sub === "/cancel") {
         if (!sameOrigin(req)) return json(res, 403, { error: "missing_ui_header" });
+        if (!ownerOk(req, live)) return json(res, 403, { error: "not_run_owner" });
         if (live !== active || !live) return json(res, 409, { error: "not_running" });
         live.abort.abort();
         return json(res, 202, { ok: true });

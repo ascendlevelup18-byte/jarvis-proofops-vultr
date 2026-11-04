@@ -42,9 +42,9 @@ test("a restart marks interrupted runs failed, never leaving them looking alive"
   const dir = mkdtempSync(join(tmpdir(), "proofops-store-"));
   const path = join(dir, "runs.db");
   const s1 = new RunStore(path);
-  s1.create({ id: "run_live", idempotencyKey: null, mode: "normal", tier: "LIVE_VULTR_SANDBOX" });
+  s1.create({ id: "run_live", idempotencyKey: null, mode: "normal", tier: "VULTR_GVISOR_SCRIPTED" });
   s1.update("run_live", { status: "running" });
-  s1.create({ id: "run_done", idempotencyKey: null, mode: "normal", tier: "LIVE_VULTR_SANDBOX" });
+  s1.create({ id: "run_done", idempotencyKey: null, mode: "normal", tier: "VULTR_GVISOR_SCRIPTED" });
   s1.update("run_done", { status: "running" });
   s1.update("run_done", { status: "completed", verdict: "PASS" });
   s1.close(); // simulated crash: no clean shutdown of run_live

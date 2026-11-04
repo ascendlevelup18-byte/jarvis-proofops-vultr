@@ -75,7 +75,7 @@ record("deployment files consistent with code", "STATIC", () => {
   for (const f of ["ops/vm-bootstrap.sh", "ops/deploy-app.sh"]) if (spawnSync(bash, ["-n", f], { cwd: ROOT }).status !== 0) problems.push(`${f} syntax`);
   const unit = readFileSync(join(ROOT, "ops/proofops.service"), "utf8");
   const server = readFileSync(join(ROOT, "apps/proofops/src/server.ts"), "utf8");
-  for (const flag of ["--sandbox", "--planner", "--model", "--port", "--deployment", "--evidence", "--data"]) {
+  for (const flag of ["--sandbox", "--port", "--deployment", "--evidence", "--data"]) {
     if (unit.includes(flag) && !server.includes(`arg("${flag.slice(2)}"`) && !server.includes(`"${flag}"`)) problems.push(`unit flag ${flag} unknown to server`);
   }
   if (!/RuntimeDirectory=proofops/.test(unit) || !server.includes(`socketRoot: "/run/proofops"`)) problems.push("socket directory mismatch");

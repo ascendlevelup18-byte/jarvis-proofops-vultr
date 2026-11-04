@@ -105,7 +105,7 @@ Local runs with a stub model are labelled `LOCAL MODEL STUB` and never count tow
 3. VM: `bash vm-bootstrap.sh`; then `git clone proofops.bundle /opt/proofops/app && chown -R proofops: /opt/proofops`.
 4. VM: `sudo -u proofops bash -c 'cd /opt/proofops/app && npm ci && (cd apps/proofops/worker && npm ci)'`; `docker build -t proofops-worker:1.64.1 apps/proofops/worker`.
 5. **gVisor gate:** `sudo -u proofops node apps/proofops/src/vm-boundary.ts --out /var/lib/proofops/vm-boundary.json`. All checks must pass (runtime observed by Docker as `runsc`, gVisor in the guest kernel log, network none, no host secrets, gateway refusals). On any failure, stop and keep the report.
-6. **Sandboxed missions, still with the scripted planner:** start `node apps/proofops/src/server.ts --sandbox --port 4317` and run `node apps/proofops/src/smoke.ts`. Tier recorded: `LIVE_VULTR_SANDBOX`, planner stub.
+6. **Sandboxed missions, still with the scripted planner:** start `node apps/proofops/src/server.ts --sandbox --port 4317` and run `node apps/proofops/src/smoke.ts`. Tier recorded: `VULTR_GVISOR_SCRIPTED`.
 7. Owner installs the inference key (`ops/set-inference-key.ps1`), after approving the subscription.
 8. `sudo -u proofops node ops/inference-smoke.mjs deepseek-v4.1-flash-1017`: one 16-token call; must return HTTP 200 and a response model.
 9. `ops/deploy-app.sh <sha> deepseek-v4.1-flash-1017 vultr:<instance-id> 45-63-82-115.sslip.io`, then run one live-model mission per scenario from the console.

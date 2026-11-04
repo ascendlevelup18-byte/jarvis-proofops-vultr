@@ -35,6 +35,8 @@ export interface WorkerHandle {
   /** OS process id of the launcher (worker process locally, docker client in the sandbox). */
   readonly pid: number | undefined;
   call<T = unknown>(op: string, args?: Record<string, unknown>, timeoutMs?: number): Promise<T>;
+  /** What Docker itself reports for the running container (sandbox only; null locally). */
+  inspect(): Promise<Record<string, unknown> | null>;
   /** Kills the worker and confirms it is gone. Safe to call more than once. */
   destroy(): Promise<{ workerGone: boolean; detail: string }>;
   events: WorkerEvent[];
@@ -121,6 +123,18 @@ export async function launchWorker(spec: LaunchSpec): Promise<WorkerHandle> {
         pending.set(id, { resolve: resolve as (v: unknown) => void, reject, timer });
         child.stdin!.write(JSON.stringify({ id, op, ...args }) + "\n");
       });
+    },
+    async inspect() {
+      if (spec.kind === "local") return null;
+      for (let i = 0; i < 40; i++) {
+        try {
+          const { stdout } = await run("docker", ["inspect", "--format", "{{json .HostConfig}}", containerName!]);
+          const h = JSON.parse(stdout) as Record<string, unknown>;
+          return { runtime: h.Runtime, networkMode: h.NetworkMode, readonlyRootfs: h.ReadonlyRootfs, capDrop: h.CapDrop, privileged: h.Privileged,
+            memory: h.Memory, nanoCpus: h.NanoCpus, pidsLimit: h.PidsLimit, binds: h.Binds };
+        } catch { await new Promise((r) => setTimeout(r, 250)); }
+      }
+      return null;
     },
     async destroy() {
       if (!exited) {

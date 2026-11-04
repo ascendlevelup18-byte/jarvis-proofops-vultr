@@ -61,7 +61,7 @@ try { codeSha = execFileSync("git", ["rev-parse", "HEAD"], { encoding: "utf8" })
 const cfg: RunConfig = {
   mode,
   planner,
-  tier: sandbox ? "LIVE_VULTR_SANDBOX" : plannerKind === "vultr" ? "LOCAL_LIVE_MODEL" : "LOCAL_MODEL_STUB",
+  tier: sandbox ? (plannerKind === "vultr" ? "VULTR_GVISOR_LIVE_MODEL" : "VULTR_GVISOR_SCRIPTED") : plannerKind === "vultr" ? "LOCAL_LIVE_MODEL" : "LOCAL_MODEL_STUB",
   storefront: { trustedBase, publicPort },
   worker: sandbox
     ? { kind: "sandbox", socketRoot: "/run/proofops", limits: { image: arg("image", "proofops-worker:1.64.1")!, runtime: (arg("runtime", "runsc") as "runsc" | "runc"), memoryMb: 1024, cpus: 1, pids: 256, chromiumNoSandbox: process.argv.includes("--chromium-no-sandbox") } }

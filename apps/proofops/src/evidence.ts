@@ -5,7 +5,7 @@
 // cross-check is what limits that.
 //   node apps/proofops/src/evidence.ts <evidence-dir> [expected-manifest-sha256]
 import { createHash } from "node:crypto";
-import { readFileSync, readdirSync, statSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync, rmSync, statSync } from "node:fs";
 import { join, relative, basename } from "node:path";
 import { specIntact, type FrozenSpec } from "./fixtures.ts";
 import { fileURLToPath } from "node:url";
@@ -44,8 +44,8 @@ export function verifyEvidence(dir: string, anchoredManifestSha256?: string | nu
       problems.push(`${rel}: missing`);
     }
   }
-  // Files that are not in the manifest are reported (substitution by addition), except the two written after it.
-  const unlisted = listFiles(dir).filter((f) => !(f in files) && !["manifest.json", "report.md", "events.jsonl"].includes(f));
+  // Files that are not in the manifest are reported (substitution by addition).
+  const unlisted = listFiles(dir).filter((f) => !(f in files) && f !== "manifest.json");
   for (const f of unlisted) problems.push(`${f}: not listed in manifest`);
   // The spec inside the bundle must be the one the manifest committed to.
   try {
@@ -59,7 +59,7 @@ export function verifyEvidence(dir: string, anchoredManifestSha256?: string | nu
 
 export type EvidenceStatus = "PASS" | "FAIL" | "INCOMPLETE" | "TAMPERED";
 
-const REQUIRED = ["spec.json", "scope.json", "assertions.json", "cleanup.json", "server-state.json", "policy-decisions.jsonl", "gateway.jsonl", "model-calls.jsonl"];
+const REQUIRED = ["spec.json", "scope.json", "assertions.json", "cleanup.json", "server-state.json", "policy-decisions.jsonl", "gateway.jsonl", "model-calls.jsonl", "events.jsonl", "report.md"];
 
 /**
  * Independent verdict on a bundle, from the files alone:
@@ -71,6 +71,12 @@ const REQUIRED = ["spec.json", "scope.json", "assertions.json", "cleanup.json", 
  */
 export function classifyEvidence(dir: string, anchoredManifestSha256?: string | null) {
   const reasons: string[] = [];
+  // A crash before sealing leaves no manifest: that is an unfinished run, unless one was anchored, which means removal.
+  if (!existsSync(join(dir, "manifest.json"))) {
+    return { status: (anchoredManifestSha256 ? "TAMPERED" : "INCOMPLETE") as EvidenceStatus,
+      reasons: [anchoredManifestSha256 ? "sealed manifest was removed" : "bundle was never sealed (no manifest)"], runId: null, runStatus: null,
+      integrity: "no manifest to check", files: 0 };
+  }
   const integrity = verifyEvidence(dir, anchoredManifestSha256);
   let status: EvidenceStatus | null = integrity.ok ? null : "TAMPERED";
   reasons.push(...integrity.problems);
@@ -98,6 +104,14 @@ export function classifyEvidence(dir: string, anchoredManifestSha256?: string | 
   };
 }
 
+/** Bounded retention: removes the oldest run bundles beyond keep. Run ids sort by time. Returns what was removed. */
+export function pruneEvidence(root: string, keep: number): string[] {
+  const runs = readdirSync(root).filter((n) => /^run_\d{14}_[0-9a-f]+$/.test(n)).sort();
+  const old = runs.slice(0, Math.max(0, runs.length - keep));
+  for (const n of old) rmSync(join(root, n), { recursive: true, force: true });
+  return old;
+}
+
 if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
   const dir = process.argv[2];
   if (!dir) {
@@ -105,6 +119,6 @@ if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
     process.exit(2);
   }
   const r = classifyEvidence(dir, process.argv[3]);
-  console.log(JSON.stringify({ dir, manifestSha256: manifestHash(dir), ...r }, null, 2));
+  console.log(JSON.stringify({ dir, manifestSha256: existsSync(join(dir, "manifest.json")) ? manifestHash(dir) : null, ...r }, null, 2));
   process.exit(r.status === "PASS" || r.status === "FAIL" ? 0 : 1);
 }

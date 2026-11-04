@@ -16,7 +16,7 @@ printf 'PasswordAuthentication no\nKbdInteractiveAuthentication no\nPermitRootLo
 sshd -t && systemctl reload ssh
 
 apt-get update -y
-apt-get install -y ca-certificates curl gnupg ufw jq sqlite3
+apt-get install -y ca-certificates curl gnupg ufw jq sqlite3 git xz-utils
 
 # Docker Engine (official repository)
 install -m 0755 -d /etc/apt/keyrings
@@ -33,11 +33,20 @@ echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/gviso
 curl -fsSL https://dl.cloudsmith.io/public/caddy/stable/gpg.key | gpg --dearmor --yes -o /usr/share/keyrings/caddy-stable-archive-keyring.gpg
 curl -fsSL https://dl.cloudsmith.io/public/caddy/stable/debian.deb.txt > /etc/apt/sources.list.d/caddy-stable.list
 
-# Node.js 24 (NodeSource)
-curl -fsSL https://deb.nodesource.com/setup_24.x | bash -
+# Node.js: pinned official release, verified against nodejs.org's published checksums (no piped install script).
+NODE_VERSION=v24.20.0
+if [ "$(/usr/local/bin/node --version 2>/dev/null || true)" != "$NODE_VERSION" ]; then
+  tmp="$(mktemp -d)"
+  curl -fsSL "https://nodejs.org/dist/$NODE_VERSION/node-$NODE_VERSION-linux-x64.tar.xz" -o "$tmp/node.tar.xz"
+  curl -fsSL "https://nodejs.org/dist/$NODE_VERSION/SHASUMS256.txt" -o "$tmp/SHASUMS256.txt"
+  expected="$(grep " node-$NODE_VERSION-linux-x64.tar.xz$" "$tmp/SHASUMS256.txt" | cut -d' ' -f1)"
+  echo "$expected  $tmp/node.tar.xz" | sha256sum -c -
+  tar -xJf "$tmp/node.tar.xz" -C /usr/local --strip-components=1
+  rm -rf "$tmp"
+fi
 
 apt-get update -y
-apt-get install -y docker-ce docker-ce-cli containerd.io runsc caddy nodejs
+apt-get install -y docker-ce docker-ce-cli containerd.io runsc caddy
 
 # Register gVisor with Docker using the systrap platform. host-uds=open lets the sandbox connect to the
 # per-run proxy socket we bind-mount; it must be verified by the boundary tests, not assumed.
@@ -67,7 +76,7 @@ sshd -T 2>/dev/null | grep -E '^(passwordauthentication|permitrootlogin) '
 docker version --format 'docker: {{.Server.Version}}'
 docker info --format 'runtimes: {{range $k, $v := .Runtimes}}{{$k}} {{end}}'
 runsc --version | head -1
-node --version
+/usr/local/bin/node --version
 caddy version
 ufw status | head -8
 docker run --rm --runtime=runsc hello-world >/dev/null && echo "gvisor: hello-world ran under runsc"

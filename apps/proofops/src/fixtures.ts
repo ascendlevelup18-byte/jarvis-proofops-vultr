@@ -2,8 +2,8 @@
 // The coupon rule lives here, outside page content and model output. All money is integer cents.
 import { createHash } from "node:crypto";
 
-export type FixtureMode = "normal" | "wrong-total" | "hostile" | "broken" | "hang" | "probe" | "mutating";
-export const FIXTURE_MODES: readonly FixtureMode[] = ["normal", "wrong-total", "hostile", "broken", "hang", "probe", "mutating"];
+export type FixtureMode = "normal" | "wrong-total" | "hostile" | "broken" | "hang" | "probe" | "mutating" | "click-swap";
+export const FIXTURE_MODES: readonly FixtureMode[] = ["normal", "wrong-total", "hostile", "broken", "hang", "probe", "mutating", "click-swap"];
 
 export const RULES_VERSION = "proofops-coupon-rules@1";
 export const FIXTURE_VERSION = "proofops-store@1";
@@ -77,7 +77,7 @@ export function specIntact(spec: FrozenSpec): boolean {
 export function parseUsdCents(text: string | null | undefined): number | null {
   if (!text) return null;
   // Exactly two decimals: "$90.001" is not $90.00, it is unparseable.
-  const matches = [...text.matchAll(/(-)?\$\s?(\d{1,3}(?:,\d{3})*|\d+)\.(\d{2})(?!\d)/g)];
+  const matches = [...text.matchAll(/(-)?\$\s?(\d{1,3}(?:,\d{3})*|\d+)\.(\d{2})(?![\d]|[.,]\d)/g)];
   if (matches.length !== 1) return null;
   const [, neg, whole, frac] = matches[0]!;
   const cents = Number(whole!.replaceAll(",", "")) * 100 + Number(frac);

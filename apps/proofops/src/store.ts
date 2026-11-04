@@ -90,6 +90,11 @@ export class RunStore {
       .run(patch.status, patch.verdict ?? null, patch.error?.slice(0, 300) ?? null, patch.evidenceDir ?? null, patch.manifestSha256 ?? null, new Date().toISOString(), id);
   }
 
+  /** Durable count for the daily run budget: survives restarts, unlike an in-memory counter. */
+  countSince(iso: string): number {
+    return Number((this.#db.prepare("SELECT count(*) AS n FROM runs WHERE created_at >= ?").get(iso) as { n: number }).n);
+  }
+
   close(): void {
     this.#db.close();
   }
