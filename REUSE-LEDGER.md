@@ -4,7 +4,7 @@
 | Status | Files | Notes |
 |---|---|---|
 | **Inherited from ACT III, in use** | `apps/api/src/provider/` (4 files), `apps/api/test/openai-compatible-client.test.ts`, `apps/api/test/fake-openai-server.ts` | OpenAI-compatible client, error types, response clean-up, and their test |
-| **Inherited scaffold, edited** | `package.json`, `package-lock.json`, `.gitignore`, `.gitattributes`, `.env.example` | Project configuration, since rewritten for ProofOps |
+| **Inherited scaffold, edited** | `package.json`, `package-lock.json`, `.gitignore`, `.env.example` | Project configuration, since rewritten for ProofOps |
 | **New for ProofOps** | `apps/proofops/` (control plane, policy, gateway, worker, signer, storefront, verifier, evidence, UI, tests), `ops/`, `proof/`, `README.md`, `SECURITY.md` | Written for this project. Git history shows when |
 | **In Git history only** | ACT III refund engine, web app, data, results and reference documents | Removed from the tree on 4 Nov 2026, not from history |
 

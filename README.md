@@ -98,9 +98,9 @@ Each result is at the commit it actually ran on. These are separate runs, not on
 
 | Test | Where | Commit | Result | Record |
 |---|---|---|---|---|
-| Unit, HTTP, model faults | Local | `2e51064` | 87/87 | [gate](proof/release-20261105/release-gate.json) |
-| Chromium and forced attacks | Local, scripted, no gVisor | `2e51064` | 52/52 | same |
-| Smoke, six missions | Local, scripted, no gVisor | `2e51064` | 6/6 | same |
+| Unit, HTTP, model faults | Local | `1f99dac` | 87/87 | [gate](proof/release-20261105/release-gate.json) |
+| Chromium and forced attacks | Local, scripted, no gVisor | `1f99dac` | 52/52 | same |
+| Smoke, six missions | Local, scripted, no gVisor | `1f99dac` | 6/6 | same |
 | gVisor boundary | Vultr VM | `d14d24c` | 24/24 | [boundary](proof/vultr-live-20261104/vm-boundary.json) |
 | Six live-model missions | Vultr VM, gVisor | `d14d24c` | As designed, including 3 designed FAILs | [runs](proof/vultr-live-20261104/runs-d14d24c/smoke-output.txt) |
 | Forced malicious proposals | Vultr VM, gVisor, **scripted planner** | `d14d24c` | 4 stopped before dispatch | [run](proof/vultr-live-20261104/forced-attack/) |
