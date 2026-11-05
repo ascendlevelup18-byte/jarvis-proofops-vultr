@@ -1,0 +1,3 @@
+{"at":"2026-11-04T14:45:23.058Z","runId":"run_20261104144520_226704dddfc16516","decision":"allow","reason":"storefront","method":"GET","target":"http://store.proofops.test/s/03f71108eb6e1b874d558b55/","status":200}
+{"at":"2026-11-04T14:45:24.073Z","runId":"run_20261104144520_226704dddfc16516","decision":"allow","reason":"storefront","method":"POST","target":"http://store.proofops.test/s/03f71108eb6e1b874d558b55/cart/add","status":303}
+{"at":"2026-11-04T14:45:24.077Z","runId":"run_20261104144520_226704dddfc16516","decision":"allow","reason":"storefront","method":"GET","target":"http://store.proofops.test/s/03f71108eb6e1b874d558b55/cart","status":200}

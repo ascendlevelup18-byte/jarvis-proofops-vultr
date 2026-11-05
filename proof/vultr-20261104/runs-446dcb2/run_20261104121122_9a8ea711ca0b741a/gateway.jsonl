@@ -1,0 +1,7 @@
+{"at":"2026-11-04T12:11:24.845Z","runId":"run_20261104121122_9a8ea711ca0b741a","decision":"allow","reason":"storefront","method":"GET","target":"http://store.proofops.test/s/039deede97cf5e32a7c76a75/","status":200}
+{"at":"2026-11-04T12:11:25.139Z","runId":"run_20261104121122_9a8ea711ca0b741a","decision":"allow","reason":"storefront","method":"POST","target":"http://store.proofops.test/s/039deede97cf5e32a7c76a75/cart/add","status":303}
+{"at":"2026-11-04T12:11:25.143Z","runId":"run_20261104121122_9a8ea711ca0b741a","decision":"allow","reason":"storefront","method":"GET","target":"http://store.proofops.test/s/039deede97cf5e32a7c76a75/cart","status":200}
+{"at":"2026-11-04T12:11:25.553Z","runId":"run_20261104121122_9a8ea711ca0b741a","decision":"allow","reason":"storefront","method":"POST","target":"http://store.proofops.test/s/039deede97cf5e32a7c76a75/cart/coupon","status":303}
+{"at":"2026-11-04T12:11:25.556Z","runId":"run_20261104121122_9a8ea711ca0b741a","decision":"allow","reason":"storefront","method":"GET","target":"http://store.proofops.test/s/039deede97cf5e32a7c76a75/cart","status":200}
+{"at":"2026-11-04T12:11:25.954Z","runId":"run_20261104121122_9a8ea711ca0b741a","decision":"allow","reason":"storefront","method":"GET","target":"http://store.proofops.test/s/039deede97cf5e32a7c76a75/checkout","status":200}
+{"at":"2026-11-04T12:11:26.464Z","runId":"run_20261104121122_9a8ea711ca0b741a","decision":"allow","reason":"storefront","method":"GET","target":"http://store.proofops.test/s/039deede97cf5e32a7c76a75/cart","status":200}

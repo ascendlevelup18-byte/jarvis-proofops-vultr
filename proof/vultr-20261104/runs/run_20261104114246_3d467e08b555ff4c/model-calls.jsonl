@@ -1,0 +1,1 @@
+{"provider":"local-model-stub","requestedModel":"local-model-stub","responseModel":"local-model-stub","responseId":null,"usage":null,"latencyMs":0,"rawContent":"{\"tool\":\"click\",\"ref\":\"e5\",\"epoch\":1}","parsed":{"tool":"click","ref":"e5","epoch":1},"error":null}

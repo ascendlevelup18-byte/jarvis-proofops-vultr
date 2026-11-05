@@ -1,0 +1,1 @@
+{"step":0,"proposal":{"tool":"click","ref":"e5","epoch":1},"decision":{"decision":"allow","rule":"click_in_scope","dispatch":{"op":"click","ref":"e5","epoch":1}},"dispatched":true,"result":"ok http://store.proofops.test/s/9970d52c473504d19cbdb536/cart"}
