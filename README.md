@@ -175,7 +175,7 @@ One active mission, six starts a minute per address, 150 starts per rolling day,
 ## Prior work disclosed
 JARVIS ProofOps is a new commerce QA and secure browser-execution product developed for Vultr Agent Rush, built on selected reusable foundations from our earlier JARVIS engineering work. It is not a clean-room implementation, and it is not a renamed ACT III.
 
-This repository starts from a sanitized snapshot of the same author's earlier project, [JARVIS ACT III](https://github.com/ascendlevelup18-byte/jarvisACTIII). [`REUSE-LEDGER.md`](REUSE-LEDGER.md) separates inherited foundations from new work, and lists every inherited file with its source commit and checksum. Git history includes that snapshot and pre-kickoff preparation, so not every commit represents work done during the event. The first ProofOps application code is `61784cc`, after kickoff. **No organizer ruling on this reuse has been confirmed.**
+This repository starts from a sanitized snapshot of the same author's earlier project, [JARVIS ACT III](https://github.com/ascendlevelup18-byte/jarvisACTIII). [`REUSE-LEDGER.md`](REUSE-LEDGER.md) separates inherited foundations from new work, and lists every inherited file with its source commit and checksum. Git history includes that snapshot and pre-kickoff preparation, so not every commit represents work done during the event. The first commit containing ProofOps application code is `61784cc`, shortly after kickoff. A commit time shows when work was committed, not when it was written. **No organizer ruling on this reuse has been confirmed.**
 
 Separate repository, history, VM and credentials. No ACT III secrets, environment files or deployment settings were copied.
 

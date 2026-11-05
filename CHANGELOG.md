@@ -19,7 +19,7 @@ First release deployed publicly with the real model.
 
 ## Earlier work
 - **4 Nov:** deployed to the Vultr VM under gVisor with a scripted planner; 24-point boundary probe; public HTTPS.
-- **3 Nov, after kickoff:** first ProofOps application code (`61784cc`, 16:09 UTC) through hardening sprints. Each defect found has a regression test.
+- **3 Nov, after kickoff:** first commit of ProofOps application code (`61784cc`, 16:09 UTC) through hardening sprints. Each defect found has a regression test.
 - **2 to 3 Nov, before kickoff:** disclosed import from JARVIS ACT III, preparation documents and deployment scripts. See [REUSE-LEDGER.md](REUSE-LEDGER.md).
 
 ## Known open items

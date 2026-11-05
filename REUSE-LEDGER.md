@@ -10,7 +10,7 @@
 
 **By size at `d14d24c`:** inherited code is 1,256 lines. ProofOps source, UI and worker are about 3,670 lines, tests about 1,580, and operations about 520. Line counts show scale, not value.
 
-**Timing:** kickoff was 3 Nov 16:00 UTC. The first ProofOps application code is `61784cc`, 16:09 UTC that day. Before kickoff, 12 commits made the disclosed import, preparation documents and deployment scripts in `ops/`.
+**Timing:** kickoff was 3 Nov 16:00 UTC. The first commit containing ProofOps application code is `61784cc`, 16:09 UTC that day. Commit times show when work was committed, not when it was written, and that commit is too large to have been written in nine minutes, so it should not be read as proof of when the code was authored. Before kickoff, 12 commits made the disclosed import, preparation documents and deployment scripts in `ops/`.
 
 ACT III's design and documentation were available while ProofOps was designed, and were kept as reference until 4 Nov. So "new" means newly written code, not that no earlier ideas informed it. **This is not a clean-room implementation. No organizer ruling on this reuse has been confirmed.** Some ProofOps work predates the event's kickoff, so dates in Git history should be read as they stand, without assuming all of it was done during the event.
 
