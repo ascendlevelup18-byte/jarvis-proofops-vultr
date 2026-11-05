@@ -96,7 +96,8 @@ One active mission, six starts a minute per address, 150 starts per rolling day,
 
 ## Evidence, releases and rollback
 - [proof/release-20261104/EVIDENCE-MAP.md](proof/release-20261104/EVIDENCE-MAP.md) maps each claim to a file or run.
-- `release-20261104` tags the production commit `d14d24c`. Commits after it change only documentation and evidence.
+- `release-20261104` tags the production commit `d14d24c`. Commits after it change only documentation and evidence, so results keep the commit they ran at.
+- [proof/CLAIMS.md](proof/CLAIMS.md) states exactly what is and is not claimed, and the version of each result.
 - [ops/RECOVERY.md](ops/RECOVERY.md) covers failures, operator commands, the labelled scripted fallback and rollback.
 
 ## Prior work disclosed

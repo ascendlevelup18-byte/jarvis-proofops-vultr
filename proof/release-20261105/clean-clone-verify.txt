@@ -1,0 +1,7 @@
+proof/vultr-live-20261104/runs-d14d24c (with anchors): addfeed1=PASS a0ec403d=FAIL f6d05b88=PASS f33c0f00=FAIL 1861224f=PASS 82ec3001=FAIL
+proof/vultr-live-20261104/runs-e5300f9 (with anchors): 70b2a730=PASS df570d6c=FAIL ed62a58c=PASS acd7f351=FAIL 7dc51f0b=PASS f309d701=INCOMPLETE
+proof/vultr-live-20261104/runs-550b51c (with anchors): 1f7c4063=PASS d9211913=PASS ca2bf3f6=FAIL fc6a931d=FAIL 2442266d=PASS dfc16516=FAIL
+proof/vultr-live-20261104/forced-attack (no anchors file): b7d400b2=PASS
+proof/vultr-20261104/runs-446dcb2 (with anchors): ca0b741a=PASS 49cec0e2=FAIL dcfe166d=PASS d9281b92=FAIL ba3d3e32=PASS 0988c5cc=FAIL
+proof/vultr-20261104/runs (no anchors file): 15793be5=PASS 07b9fea1=FAIL f4b7fd09=PASS 431230d6=FAIL 15a86f4a=PASS b555ff4c=FAIL
+No bundle reads TAMPERED in a clean clone.
