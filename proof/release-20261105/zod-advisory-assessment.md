@@ -28,6 +28,6 @@ control: z.array(z.string().uuid()) 2M     rejected issues=2000000 974.0ms heap+
 ```
 The last line is a control showing the vulnerable shape does misbehave on this machine. The worst case for the ProofOps schema is the 500,000-key object, rejected with one issue.
 
-**Limits of this assessment:** self-performed, one machine. A compromised provider returning a huge reply could still use memory in `JSON.parse`, independently of zod and of this advisory; the client doesn't cap reply size before parsing. Reaching that would need control of the provider or its connection.
+**Limits of this assessment:** self-performed, one machine. The provider client also rejects any reply over 1 MiB before parsing (`readBodyLimited` in `apps/api/src/provider/openai-compatible-client.ts`), so the inputs tested above are larger than the schema can receive in production. The schema in the test is a copy of the one in `policy.ts`.
 
 **Fix:** `zod` 4.6.6 is on branch `review/work-upgrade-patch`, where `npm audit` reports 0 and the local gate passes. It has not been deployed or tested on the VM, and production stays frozen.
