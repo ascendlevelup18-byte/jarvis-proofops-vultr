@@ -8,7 +8,7 @@ The one reference for the video, deck, README, form and audit. If a statement is
 | Final code | `d14d24c`, tag `release-20261104` | What runs on the public demo |
 | Evidence | `35e201d`, tag `evidence-20261105` | First commit where every bundle verifies from a clean clone |
 | `c360f56` | Superseded as a reference | Where the 4 Nov results were first recorded. **124 run logs were git-ignored there, so a clone of it shows bundles as TAMPERED.** Bundles themselves were never changed |
-| Repository `main` | Later than both | Documentation and evidence only since `d14d24c`, plus `package.json` description |
+| Repository `main` | Later than both | Documentation, evidence, metadata and `proof/verify-all.mjs` only since `d14d24c` |
 
 Results keep the commit they ran at. Never present an evidence commit as deployed code, or several runs as one release run.
 
@@ -40,11 +40,13 @@ Demonstrated, within a stated scope.
 | Evidence integrity | Shows no change since sealing, relative to a registry on the same VM. Root could rewrite both |
 | Independent verification | Deterministic checks of this store. Runs on the same VM as the control plane |
 | Isolation | The boundary as configured. Not proof gVisor has no flaws |
-| Human approval | Synthetic orders, fixed demo identity, process separation only |
+| Human approval | Synthetic orders, fixed demo identity, process separation only. Store, approvals and nonces are in memory, and the signer's key is regenerated at each start |
 | Local test counts: 87/87, 52/52, 6/6 | Local tier, scripted planner, no gVisor |
 | Provider 429, 5xx, timeouts | Against a local mock only. Provider 401 was tested against the real endpoint |
 | Cost: about $0.001 per mission | Calculated at catalog prices from recorded tokens. **Not a bill** |
 | Reboot recovery in 34 seconds | One reboot at `85de6ce` |
+
+| Known issue | `npm audit`: one high advisory in `zod` 4.6.5. Its affected path isn't used by our schemas, by reading the code. Upgrade held with the freeze |
 
 ## REPORTED
 Stated by an agent or a person, without a file here that proves it.

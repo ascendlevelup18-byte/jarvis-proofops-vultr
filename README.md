@@ -4,11 +4,11 @@ Policy-controlled autonomous browser execution inside isolated environments, wit
 
 | | |
 |---|---|
-| **What is this?** | A commerce QA agent. A real model on Vultr Serverless Inference operates a real Chromium browser inside gVisor on a Vultr VM. A working prototype on one synthetic store. Entry for Vultr Agent Rush 2026, Challenge 1: Blast Radius Zero. |
-| **Why does it matter?** | An agent can finish a task and still be wrong, and a web page can try to take it over. Here the agent's report isn't the verdict, and what it can reach is limited outside the model. |
-| **How does it work?** | The model proposes one typed action. Policy decides. The browser acts in a sandbox with no network except a gateway to its own store session. A separate verifier compares frozen expectations with the page and the store's records. A human approves any order. |
-| **How can I try it?** | Open **[the live demo](https://45-63-82-115.sslip.io)**, or [run it locally](#run-it-locally) with a scripted planner. |
-| **Where is the evidence?** | [Fact sheet](proof/FACT-SHEET.md) (what is and isn't claimed), [evidence map](proof/release-20261104/EVIDENCE-MAP.md) (each claim to its file), and [sealed run bundles](proof/vultr-live-20261104/README.md) you can [verify yourself](#evidence-integrity). |
+| **What does it do?** | Runs a commerce QA task with an AI agent in a real browser, limits what the agent can reach, and checks the result without trusting the agent. A working prototype on one synthetic store. Entry for Vultr Agent Rush 2026, Challenge 1: Blast Radius Zero. |
+| **Why is it different?** | An agent can finish a task and still be wrong, and a web page can try to take it over. Here the agent's report isn't the verdict, the model has no authority of its own, and every run leaves evidence you can check. In our recorded run the model reached checkout and reported the promo applied on a $95 cart that should have been $90, and the verifier failed it. |
+| **What runs on Vultr?** | All of it. Vultr Serverless Inference runs the model (`deepseek-v4.1-flash-1017`), and one Vultr VM runs the control plane, policy, gateway, verifier, the synthetic store, and Chromium inside gVisor. |
+| **How do I try it?** | Open **[the live demo](https://45-63-82-115.sslip.io)**, or [run it locally](#run-it-locally) with a scripted planner. |
+| **What can I inspect?** | [Fact sheet](proof/FACT-SHEET.md) (what is and isn't claimed), [evidence map](proof/release-20261104/EVIDENCE-MAP.md) (each claim to its file), and [sealed run bundles](proof/vultr-live-20261104/README.md) you can [verify yourself](#evidence-integrity) with one command. |
 
 ![The hostile-page mission on the live demo: verified result, four refused requests and the evidence panel](proof/vultr-live-20261104/ui/04-hostile-page.png)
 
@@ -78,6 +78,15 @@ Each mission starts a new container with `--runtime=runsc --network=none --read-
 
 A [24-point probe](proof/vultr-live-20261104/vm-boundary.json) runs inside a real worker. It confirms the runtime as seen by Docker and from inside, and that internet, metadata, IPv6, DNS, UDP and the host bridge all fail. It confirms the gateway reaches the run's store and refuses other hosts, metadata, loopback, other sessions and tunnels. The [host view](proof/vultr-live-20261104/host-view-during-live-mission.txt) shows `runsc-sandbox` and `runsc-gofer` during a live mission.
 
+## Approval flow
+1. The model asks for approval with `request_approval`. It can't place an order itself, and policy refuses a direct click on the order button.
+2. The operator sees the exact item, promo code, total and cart hash. Only the browser that started the mission can answer.
+3. A separate signer process issues an Ed25519 approval bound to the run and that cart's hash, single-use and expiring.
+4. The store verifies the signature itself and consumes the nonce as it places the order.
+5. The run replays the used approval straight to the store, and records the refusal (HTTP 403).
+
+This covers synthetic orders. Sessions, approvals and consumed nonces are held in memory, so a restart ends them. The signer's key is regenerated at each start, and the operator identity is a fixed demo label.
+
 ## Independent verifier
 Before the first model call, the expected subtotal, discount, total, cart and order count are frozen in a sealed spec. After the run, [`verifier.ts`](apps/proofops/src/verifier.ts) checks them against the page and against the store's own records, without using the model's report. Results fall into five outcomes: commerce, permissions, containment, evidence and cleanup.
 
@@ -91,7 +100,13 @@ Verify a bundle from a clone. Anchors are in [`ANCHORS.txt`](proof/vultr-live-20
 ```
 node apps/proofops/src/evidence.ts proof/vultr-live-20261104/runs-d14d24c/<run-id> <anchor>
 ```
-On the live demo, use **Re-check evidence integrity**.
+Or check every committed bundle at once, with Node 24 and no install:
+```
+git clone https://github.com/ascendlevelup18-byte/jarvis-proofops-vultr
+cd jarvis-proofops-vultr
+node --no-warnings proof/verify-all.mjs
+```
+PASS and FAIL are sealed verdicts, so designed FAILs are expected. One historical bundle reads INCOMPLETE ("worker teardown not proven", at `e5300f9`), and it's kept as recorded. On the live demo, use **Re-check evidence integrity**.
 
 ## Test results
 Each result is at the commit it actually ran on. These are separate runs, not one release run.
@@ -153,17 +168,19 @@ One active mission, six starts a minute per address, 150 starts per rolling day,
 - **Boundary tested as configured.** That's not proof gVisor has no flaws, and there's been no third-party penetration test.
 - **Model behavior is an observation.** In the recorded hostile runs the model ignored the page's injection. That isn't a resistance rate. Policy's refusals come from a separate test with proposals forced by a harness. **No model has been seen being stopped by policy.**
 - **One instance, one mission at a time, no accounts.** One visitor can use up the shared daily cap.
+- **State in memory:** the store, approvals and live streams don't survive a restart. Only the run registry and evidence do.
+- **One dependency advisory at `d14d24c`:** `npm audit` reports [GHSA-mrhx-c7xc-m3w5](https://github.com/advisories/GHSA-mrhx-c7xc-m3w5) in `zod` 4.6.5, memory exhaustion on oversized constrained collections. ProofOps' schemas have no such collections, and zod validates only model replies, not visitor input. The upgrade is held with the release freeze.
 - **Known UI issues at `d14d24c`:** the integrity button reads "Intact: undefined files" if the check itself returns an error, which hasn't occurred in production. Clicking another mission just after **Run mission** can show the wrong title over the run. An open page stays on "Reconnecting…" after a service restart until reloaded. Fixes are on a review branch, held so the tested release stays frozen.
 
 ## Prior work disclosed
 JARVIS ProofOps is a new commerce QA and secure browser-execution product developed for Vultr Agent Rush, built on selected reusable foundations from our earlier JARVIS engineering work. It is not a clean-room implementation, and it is not a renamed ACT III.
 
-This repository starts from a sanitized snapshot of the same author's earlier project, [JARVIS ACT III](https://github.com/ascendlevelup18-byte/jarvisACTIII). [`REUSE-LEDGER.md`](REUSE-LEDGER.md) separates inherited foundations from new work, and lists every inherited file with its source commit and checksum. Git history includes that snapshot and pre-kickoff preparation, so not every commit represents work done during the event. **No organizer ruling on this reuse has been confirmed.**
+This repository starts from a sanitized snapshot of the same author's earlier project, [JARVIS ACT III](https://github.com/ascendlevelup18-byte/jarvisACTIII). [`REUSE-LEDGER.md`](REUSE-LEDGER.md) separates inherited foundations from new work, and lists every inherited file with its source commit and checksum. Git history includes that snapshot and pre-kickoff preparation, so not every commit represents work done during the event. The first ProofOps application code is `61784cc`, after kickoff. **No organizer ruling on this reuse has been confirmed.**
 
 Separate repository, history, VM and credentials. No ACT III secrets, environment files or deployment settings were copied.
 
 ## Roadmap
-A prototype today. Proposed next steps, none implemented: signed evidence with an external anchor, durable approval records, login and roles, one real staging-store connector with no real payments, and an external penetration test. Then multi-tenant operation and organization policies.
+A prototype today. See also the [changelog](CHANGELOG.md) and [how to contribute](CONTRIBUTING.md). Proposed next steps, none implemented: signed evidence with an external anchor, durable approval records, login and roles, one real staging-store connector with no real payments, and an external penetration test. Then multi-tenant operation and organization policies.
 
 ## License and third-party software
 MIT, see [LICENSE](LICENSE). Runtime: [Playwright](https://playwright.dev) (Apache-2.0), [zod](https://zod.dev) (MIT). On the VM: Docker, [gVisor](https://gvisor.dev) (Apache-2.0), [Caddy](https://caddyserver.com) (Apache-2.0), Node.js (MIT).
