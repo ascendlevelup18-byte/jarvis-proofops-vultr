@@ -2,7 +2,7 @@
   "name": "jarvis-proofops-vultr",
   "version": "0.1.0",
   "private": true,
-  "description": "JARVIS: autonomous ecommerce exception resolver (duplicate charge workflow)",
+  "description": "JARVIS ProofOps: policy-controlled browser agent in gVisor on Vultr, with independently verified outcomes and auditable evidence",
   "type": "module",
   "engines": {
     "node": ">=24"

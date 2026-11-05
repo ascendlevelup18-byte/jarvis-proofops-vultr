@@ -1,5 +1,17 @@
 # Reuse ledger: what ProofOps inherited from JARVIS ACT III
 
+## Current tree: inherited and new
+| Status | Files | Notes |
+|---|---|---|
+| **Inherited from ACT III, in use** | `apps/api/src/provider/` (4 files), `apps/api/test/openai-compatible-client.test.ts`, `apps/api/test/fake-openai-server.ts` | OpenAI-compatible client, error types, response clean-up, and their test |
+| **Inherited scaffold, edited** | `package.json`, `package-lock.json`, `.gitignore`, `.gitattributes`, `.env.example` | Project configuration, since rewritten for ProofOps |
+| **New for ProofOps** | `apps/proofops/` (control plane, policy, gateway, worker, signer, storefront, verifier, evidence, UI, tests), `ops/`, `proof/`, `README.md`, `SECURITY.md` | Written for this project. Git history shows when |
+| **In Git history only** | ACT III refund engine, web app, data, results and reference documents | Removed from the tree on 4 Nov 2026, not from history |
+
+ACT III's design and documentation were available while ProofOps was designed, and were kept as reference until 4 Nov. So "new" means newly written code, not that no earlier ideas informed it. **This is not a clean-room implementation. No organizer ruling on this reuse has been confirmed.** Some ProofOps work predates the event's kickoff, so dates in Git history should be read as they stand, without assuming all of it was done during the event.
+
+## At the time of copying
+
 Copied on 2 Nov 2026 from the owner's own repository https://github.com/ascendlevelup18-byte/jarvisACTIII (same author, ASCEND Revolution), using `git archive` so only committed files came across: no `.env`, `.vercel/`, deployment tokens, logs, user data or build output.
 
 - `apps/`, `data/`, `evals/results/`, `package*.json`: ACT III commit `c69ca2c` (tag `championship-release-20261018`).

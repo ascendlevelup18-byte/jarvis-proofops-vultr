@@ -1,0 +1,26 @@
+PASS  desktop 1440x900: loads, no console errors, no sideways scroll  [5492 ms, 6 missions, overflow 0]
+PASS  header discloses live model and sandbox  [Model: deepseek-v4.1-flash-1017 (Vultr Serverless Inference) | Sandbox: gVisor (runsc) | Code d14d24c31cf3]
+PASS  header shows production code
+PASS  mission selection works
+PASS  missions reachable by keyboard
+PASS  recent runs listed with verdicts
+PASS  page has a main landmark and headings
+PASS  screenshot element has alt text
+PASS  Run button present and enabled when idle
+PASS  laptop 1280x720: loads, no console errors, no sideways scroll  [2416 ms, 6 missions, overflow 0]
+PASS  tablet 768x1024: loads, no console errors, no sideways scroll  [2340 ms, 6 missions, overflow 0]
+PASS  phone 375x812: loads, no console errors, no sideways scroll  [2294 ms, 6 missions, overflow 0]
+PASS  no mutating request sent by this check  [0]
+PASS  evidence link report.md  [HTTP 200]
+PASS  evidence link manifest.json  [HTTP 200]
+PASS  evidence link assertions.json  [HTTP 200]
+PASS  evidence link policy-decisions.jsonl  [HTTP 200]
+PASS  evidence link model-calls.jsonl  [HTTP 200]
+PASS  evidence link gateway.jsonl  [HTTP 200]
+PASS  evidence link server-state.json  [HTTP 200]
+PASS  evidence link cleanup.json  [HTTP 200]
+PASS  evidence link spec.json  [HTTP 200]
+PASS  evidence link screenshots/final.png  [HTTP 200]
+PASS  hostile run matches its anchor  [PASS, 22 files]
+health latency ms: 253, 259, 250, 258, 249
+All passive checks passed.
