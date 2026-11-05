@@ -32,7 +32,7 @@ bash /opt/proofops/app/ops/operator.sh live
 ```
 
 ## Rollback
-Each release commit is tagged, and `git tag` on the VM or PC lists them. Older commits stay on the VM because it receives the full history.
+Release commits are tagged in the repository, and `git tag` lists them on the PC. The VM has no tags, but it has the commits, because it receives the full history of `main`.
 ```
 bash /opt/proofops/app/ops/operator.sh rollback <sha>
 ```
