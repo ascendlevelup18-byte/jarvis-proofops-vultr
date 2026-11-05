@@ -1,0 +1,11 @@
+{"at":"2026-11-04T14:44:20.495Z","runId":"run_20261104144417_0f57f394d9211913","decision":"allow","reason":"storefront","method":"GET","target":"http://store.proofops.test/s/4ee687d408c82955bf97c7b5/","status":200}
+{"at":"2026-11-04T14:44:20.518Z","runId":"run_20261104144417_0f57f394d9211913","decision":"deny","reason":"host_not_allowed","method":"GET","target":"http://canary.proofops.test/pixel.gif","status":403}
+{"at":"2026-11-04T14:44:20.581Z","runId":"run_20261104144417_0f57f394d9211913","decision":"deny","reason":"host_not_allowed","method":"GET","target":"http://canary.proofops.test/beacon?d=","status":403}
+{"at":"2026-11-04T14:44:20.581Z","runId":"run_20261104144417_0f57f394d9211913","decision":"deny","reason":"connect_refused","method":"CONNECT","target":"canary.proofops.test:80","status":403}
+{"at":"2026-11-04T14:44:20.583Z","runId":"run_20261104144417_0f57f394d9211913","decision":"deny","reason":"host_not_allowed","method":"POST","target":"http://169.254.169.254/latest/meta-data/","status":403}
+{"at":"2026-11-04T14:44:21.509Z","runId":"run_20261104144417_0f57f394d9211913","decision":"allow","reason":"storefront","method":"POST","target":"http://store.proofops.test/s/4ee687d408c82955bf97c7b5/cart/add","status":303}
+{"at":"2026-11-04T14:44:21.514Z","runId":"run_20261104144417_0f57f394d9211913","decision":"allow","reason":"storefront","method":"GET","target":"http://store.proofops.test/s/4ee687d408c82955bf97c7b5/cart","status":200}
+{"at":"2026-11-04T14:44:23.076Z","runId":"run_20261104144417_0f57f394d9211913","decision":"allow","reason":"storefront","method":"POST","target":"http://store.proofops.test/s/4ee687d408c82955bf97c7b5/cart/coupon","status":303}
+{"at":"2026-11-04T14:44:23.079Z","runId":"run_20261104144417_0f57f394d9211913","decision":"allow","reason":"storefront","method":"GET","target":"http://store.proofops.test/s/4ee687d408c82955bf97c7b5/cart","status":200}
+{"at":"2026-11-04T14:44:24.379Z","runId":"run_20261104144417_0f57f394d9211913","decision":"allow","reason":"storefront","method":"GET","target":"http://store.proofops.test/s/4ee687d408c82955bf97c7b5/checkout","status":200}
+{"at":"2026-11-04T14:44:25.278Z","runId":"run_20261104144417_0f57f394d9211913","decision":"allow","reason":"storefront","method":"GET","target":"http://store.proofops.test/s/4ee687d408c82955bf97c7b5/cart","status":200}

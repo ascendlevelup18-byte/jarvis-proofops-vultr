@@ -1,0 +1,93 @@
+{
+  "at": "2026-11-05T13:15:02.208Z",
+  "head": "1f99dac41b4c9fe943060e8e211ec6dc38383d68",
+  "gates": [
+    {
+      "gate": "typecheck",
+      "tier": "UNIT",
+      "status": "PASS",
+      "detail": "clean",
+      "seconds": 0.3
+    },
+    {
+      "gate": "unit + HTTP + model-fault tests",
+      "tier": "UNIT/HTTP",
+      "status": "PASS",
+      "detail": "87/87 passed, 0 failed",
+      "seconds": 6.9
+    },
+    {
+      "gate": "local Chromium + forced-attack e2e",
+      "tier": "LOCAL_CHROMIUM/LOCAL_FORCED_ATTACK",
+      "status": "PASS",
+      "detail": "52/52 passed, 0 failed",
+      "seconds": 127.7
+    },
+    {
+      "gate": "smoke: 6 missions as designed",
+      "tier": "LOCAL_SCRIPTED",
+      "status": "PASS",
+      "detail": "6/6 missions ok",
+      "seconds": 32
+    },
+    {
+      "gate": "evidence: every bundle intact and sealed",
+      "tier": "LOCAL_SCRIPTED",
+      "status": "PASS",
+      "detail": "6 bundles; 0 tampered/incomplete",
+      "seconds": 0.1
+    },
+    {
+      "gate": "secret scan (tracked files)",
+      "tier": "REPO",
+      "status": "PASS",
+      "detail": "no secret patterns",
+      "seconds": 0.1
+    },
+    {
+      "gate": "deployment files consistent with code",
+      "tier": "STATIC",
+      "status": "PASS",
+      "detail": "bootstrap, deploy, unit, Caddy, worker image and runtime flags agree",
+      "seconds": 0.1
+    },
+    {
+      "gate": "working tree clean (no evidence drift)",
+      "tier": "REPO",
+      "status": "PASS",
+      "detail": "clean",
+      "seconds": 0
+    },
+    {
+      "gate": "gVisor boundary probe (vm-boundary.ts)",
+      "tier": "VULTR_GVISOR",
+      "status": "NOT_RUN",
+      "detail": "runs on the VM only; last result in proof/",
+      "seconds": 0
+    },
+    {
+      "gate": "sandboxed missions on the VM",
+      "tier": "VULTR_GVISOR",
+      "status": "NOT_RUN",
+      "detail": "runs on the VM only; last result in proof/",
+      "seconds": 0
+    },
+    {
+      "gate": "public HTTPS rehearsal (rehearse.mjs)",
+      "tier": "VULTR_GVISOR",
+      "status": "NOT_RUN",
+      "detail": "run against the deployed URL; last result in proof/",
+      "seconds": 0
+    },
+    {
+      "gate": "live Vultr model missions",
+      "tier": "VULTR_LIVE_MODEL",
+      "status": "NOT_RUN",
+      "detail": "runs on the VM and costs tokens; last result in proof/",
+      "seconds": 0
+    }
+  ],
+  "passed": 8,
+  "failed": 0,
+  "blocked": 0
+}

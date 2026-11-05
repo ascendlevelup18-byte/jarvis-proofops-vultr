@@ -1,0 +1,1 @@
+Caddy check rerun with the hostname variable set, 5 Nov: Valid configuration. (The line in readonly-check.txt failed because the check omitted that variable.)

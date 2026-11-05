@@ -1,0 +1,39 @@
+PRODUCTION-d14d24c  T1 evidence check on HTTP 400 shows: "Intact: undefined files match the anchored manifest. Sealed verdict undefined."
+PRODUCTION-d14d24c  T2 Run button while the start is in flight: ENABLED
+PRODUCTION-d14d24c  T2 mission title shown / mission actually run: MISSION · WRONG DISCOUNT / normal
+PRODUCTION-d14d24c  T3 open page after restart: status / Run button: RECONNECTING… / disabled
+PRODUCTION-d14d24c  T3 error line: ""
+PRODUCTION-d14d24c  T3 after reload: status / verdict / Run button: IDLE / "Waiting for the run" / enabled
+PRODUCTION-d14d24c  T3 page errors: 0
+PRODUCTION-d14d24c  T4 1440x900: overflow 0px, stages at y=205, timeline at y=315, verdict at y=865
+PRODUCTION-d14d24c  T4 1280x720: overflow 0px, stages at y=253, timeline at y=381, verdict at y=931
+PRODUCTION-d14d24c  T4 768x1024: overflow 0px, stages at y=363, timeline at y=557, verdict at y=1538
+PRODUCTION-d14d24c  T4 375x812: overflow 0px, stages at y=1601, timeline at y=1807, verdict at y=2786
+PRODUCTION-d14d24c  T5 health during a mission: "active":"run_<id>"
+PRODUCTION-d14d24c  T5 clear-workers guard in this code: sees the mission and refuses
+WORK-AS-RECEIVED  T1 evidence check on HTTP 400 shows: "Evidence is unavailable or the check failed."
+WORK-AS-RECEIVED  T2 Run button while the start is in flight: disabled
+WORK-AS-RECEIVED  T2 mission title shown / mission actually run: MISSION · CORRECT DISCOUNT / normal
+WORK-AS-RECEIVED  T3 open page after restart: status / Run button: FAILED / enabled
+WORK-AS-RECEIVED  T3 error line: ""
+WORK-AS-RECEIVED  T3 after reload: status / verdict / Run button: FAILED / "No sealed verdict" / enabled
+WORK-AS-RECEIVED  T3 page errors: 0
+WORK-AS-RECEIVED  T4 1440x900: overflow 0px, stages at y=390, timeline at y=500, verdict at y=1050
+WORK-AS-RECEIVED  T4 1280x720: overflow 0px, stages at y=389, timeline at y=517, verdict at y=1067
+WORK-AS-RECEIVED  T4 768x1024: overflow 0px, stages at y=406, timeline at y=600, verdict at y=1581
+WORK-AS-RECEIVED  T4 375x812: overflow 0px, stages at y=1589, timeline at y=1795, verdict at y=2774
+WORK-AS-RECEIVED  T5 health during a mission: "active":true
+WORK-AS-RECEIVED  T5 clear-workers guard in this code: DOES NOT SEE THE MISSION: it would remove the running worker
+CORRECTED-5049dd7  T1 evidence check on HTTP 400 shows: "Evidence is unavailable or the check failed."
+CORRECTED-5049dd7  T2 Run button while the start is in flight: disabled
+CORRECTED-5049dd7  T2 mission title shown / mission actually run: MISSION · CORRECT DISCOUNT / normal
+CORRECTED-5049dd7  T3 open page after restart: status / Run button: FAILED / enabled
+CORRECTED-5049dd7  T3 error line: ""
+CORRECTED-5049dd7  T3 after reload: status / verdict / Run button: FAILED / "No sealed verdict" / enabled
+CORRECTED-5049dd7  T3 page errors: 0
+CORRECTED-5049dd7  T4 1440x900: overflow 0px, stages at y=205, timeline at y=315, verdict at y=865
+CORRECTED-5049dd7  T4 1280x720: overflow 0px, stages at y=253, timeline at y=381, verdict at y=931
+CORRECTED-5049dd7  T4 768x1024: overflow 0px, stages at y=363, timeline at y=557, verdict at y=1538
+CORRECTED-5049dd7  T4 375x812: overflow 0px, stages at y=1560, timeline at y=1767, verdict at y=2746
+CORRECTED-5049dd7  T5 health during a mission: "active":true
+CORRECTED-5049dd7  T5 clear-workers guard in this code: sees the mission and refuses

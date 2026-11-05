@@ -1,0 +1,61 @@
+Created symlink /etc/systemd/system/multi-user.target.wants/caddy.service → /usr/lib/systemd/system/caddy.service.
+Setting up docker-ce-rootless-extras (5:29.9.3-1~ubuntu.24.04~noble) ...
+Setting up docker-ce (5:29.9.3-1~ubuntu.24.04~noble) ...
+Created symlink /etc/systemd/system/multi-user.target.wants/docker.service → /usr/lib/systemd/system/docker.service.
+Created symlink /etc/systemd/system/sockets.target.wants/docker.socket → /usr/lib/systemd/system/docker.socket.
+Processing triggers for man-db (2.12.0-4build2) ...
+
+Running kernel seems to be up-to-date.
+
+Restarting services...
+
+Service restarts being deferred:
+ /etc/needrestart/restart.d/dbus.service
+ systemctl restart systemd-logind.service
+ systemctl restart unattended-upgrades.service
+
+No containers need to be restarted.
+
+No user sessions are running outdated binaries.
+
+No VM guests are running outdated hypervisor (qemu) binaries on this host.
+2026/11/04 11:36:01 Runtime runsc not found: adding
+2026/11/04 11:36:01 Successfully updated config.
+Default incoming policy changed to 'deny'
+(be sure to update your rules accordingly)
+Default outgoing policy changed to 'allow'
+(be sure to update your rules accordingly)
+Skipping adding existing rule
+Skipping adding existing rule (v6)
+Rule added
+Rule added (v6)
+Rule added
+Rule added (v6)
+Firewall is active and enabled on system startup
+--- verification
+os: Ubuntu 24.04.5 LTS
+permitrootlogin without-password
+passwordauthentication no
+docker: 29.9.3
+runtimes: io.containerd.runc.v2 runc runsc 
+runsc version release-20261102.0
+v24.20.0
+v2.11.8 h1:E2pv1BoZ5bJaWqFkU6QvLa21iGAX8bDzlEQG4dDQ/Vc=
+Status: active
+
+To                         Action      From
+--                         ------      ----
+22/tcp                     ALLOW       Anywhere                  
+80/tcp                     ALLOW       Anywhere                  
+443/tcp                    ALLOW       Anywhere                  
+22/tcp (v6)                ALLOW       Anywhere (v6)             
+Unable to find image 'hello-world:latest' locally
+latest: Pulling from library/hello-world
+4f55086f7dd0: Pulling fs layer
+4f55086f7dd0: Download complete
+d5e71e642bf5: Download complete
+4f55086f7dd0: Pull complete
+Digest: sha256:c567b231f65614688711a75f31518a064258a51d442117a3e771a3a8fdba78ef
+Status: Downloaded newer image for hello-world:latest
+gvisor: hello-world ran under runsc
+EXIT=0
