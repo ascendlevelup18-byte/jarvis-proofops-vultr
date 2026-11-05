@@ -29,7 +29,7 @@ The store is synthetic, so no real products, payments or customers are involved.
 3. Run **Approved checkout**, review the exact cart, and approve one synthetic order. The run then replays the used approval, and the store refuses it.
 4. Use **Re-check evidence integrity**, then open the run report and logs.
 
-One mission runs at a time. If you see "Another mission is still running", someone else is using the demo, so wait and try again. Each mission uses real tokens, so please don't run them in a loop.
+On a laptop, scroll down for **Run mission** and for the verdict when a mission ends. One mission runs at a time. If you see "Another mission is still running", someone else is using the demo, so wait and try again. Each mission uses real tokens, so please don't run them in a loop.
 
 | Wrong total fails | Human approves the exact cart | Hung page is destroyed |
 |---|---|---|
@@ -169,8 +169,9 @@ One active mission, six starts a minute per address, 150 starts per rolling day,
 - **Model behavior is an observation.** In the recorded hostile runs the model ignored the page's injection. That isn't a resistance rate. Policy's refusals come from a separate test with proposals forced by a harness. **No model has been seen being stopped by policy.**
 - **One instance, one mission at a time, no accounts.** One visitor can use up the shared daily cap.
 - **State in memory:** the store, approvals and live streams don't survive a restart. Only the run registry and evidence do.
-- **One dependency advisory at `d14d24c`:** `npm audit` reports [GHSA-mrhx-c7xc-m3w5](https://github.com/advisories/GHSA-mrhx-c7xc-m3w5) in `zod` 4.6.5, memory exhaustion on oversized constrained collections. ProofOps' schemas have no such collections, and zod validates only model replies, not visitor input. The upgrade is held with the release freeze.
+- **One dependency advisory at `d14d24c`:** `npm audit` reports [GHSA-mrhx-c7xc-m3w5](https://github.com/advisories/GHSA-mrhx-c7xc-m3w5), high severity, in `zod` 4.6.5: an oversized input to a collection schema can exhaust memory. ProofOps' only zod schema has no collections and validates model replies, not visitor input. Our [assessment and test](proof/release-20261105/zod-advisory-assessment.md) found it not reachable; that is our own review. The upgrade to 4.6.6 is held with the release freeze.
 - **Known UI issues at `d14d24c`:** the integrity button reads "Intact: undefined files" if the check itself returns an error, which hasn't occurred in production. Clicking another mission just after **Run mission** can show the wrong title over the run. An open page stays on "Reconnecting…" after a service restart until reloaded. Fixes are on a review branch, held so the tested release stays frozen.
+- **Laptop layout at `d14d24c`:** **Run mission** and the verdict can sit below the fold, so scroll down for both. Recent runs on the page can't be opened; use the [sealed run bundles](proof/vultr-live-20261104/README.md) instead.
 
 ## Prior work disclosed
 JARVIS ProofOps is a new commerce QA and secure browser-execution product developed for Vultr Agent Rush, built on selected reusable foundations from our earlier JARVIS engineering work. It is not a clean-room implementation, and it is not a renamed ACT III.

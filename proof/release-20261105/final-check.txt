@@ -1,0 +1,43 @@
+Final read-only check, 5 Nov 2026, from a fresh clone of main at 4b1b813
+
+clone HEAD 4b1b813 files 813
+  FAIL       run_20261104114246_3d467e08b555ff4c  12 files
+
+{"PASS":16,"FAIL":14,"INCOMPLETE":1}. None TAMPERED.
+verify exit 0
+200 https://zod.dev
+200 https://gvisor.dev
+200 https://caddyserver.com
+48 links checked, 7 web. No problems.
+--- Identifying details in the current tree
+public VM address: 72 line(s) in 70 file(s). Samples: 45-6… (12 chars), 45.6… (12 chars)
+   README.md, ops/DAY1-RUNBOOK.md, proof/RECORDING-SEQUENCE.md, proof/release-20261104/production-audit.txt, proof/vultr-20261104/README.md, proof/vultr-20261104/runs-446dcb2/run_20261104121122_9a8ea711ca0b741a/manifest.json, proof/vultr-20261104/runs-446dcb2/run_20261104121122_9a8ea711ca0b741a/report.md, proof/vultr-20261104/runs-446dcb2/run_20261104121127_83ec383a49cec0e2/manifest.json, …
+
+--- Risky file names in any commit (1075 paths checked)
+.env.example
+apps/api/.env.example
+
+--- Author and committer identities
+67  ascendlevelup18-byte <ascend.levelup18@gmail.com> | ascendlevelup18-byte <ascend.levelup18@gmail.com>
+Co-Authored-By trailers: Claude Opus 5.5 <noreply@anthropic.com>, Claude Opus 5.5 (1M context) <noreply@anthropic.com>
+commit messages naming the Gmail address: 0, the Supabase ref: 0
+node v24.20.0
+ok   npm ci --no-audit --no-fund  (2s)
+ok   npm ci --no-audit --no-fund  (1s)
+ok   npx playwright install chromium  (2s)
+JARVIS ProofOps control plane on http://127.0.0.1:4317  (tier LOCAL_MODEL_STUB, code 4b1b813)
+ok   npm run proofops:smoke  (34s)
+ProofOps smoke against http://127.0.0.1:4317: tier LOCAL_MODEL_STUB, planner {"provider":"local-model-stub"}, isolation 
+ok s1-correct-discount completed verdict=PASS blocked=0 evidence=PASS 2.1s run_20261105141834_f34c1509d6700810
+ok s1b-wrong-discount completed verdict=FAIL blocked=0 evidence=FAIL 1.1s run_20261105141837_6b88ea78601c38d0
+ok s2-hostile-page completed verdict=PASS blocked=4 evidence=PASS 1.6s run_20261105141838_279572f9bca95616
+ok s3-broken-checkout completed verdict=FAIL blocked=0 evidence=FAIL 1.2s run_20261105141839_54244bd9c6e2ec70
+ok s4-approved-checkout completed verdict=PASS blocked=1 evidence=PASS 1.6s run_20261105141840_c9c6498df3dd4f4d
+ok s5-hung-page timed_out verdict=FAIL blocked=0 evidence=FAIL 25.5s run_20261105141842_15195773f557fd77
+All missions behaved as designed.
+quickstart exit 0
+
+[exited with code 0]
+
+Deployed files at /opt/proofops/app compared with git tag release-20261104: 55 compared, 0 differ
+Mermaid architecture block rendered by mermaid 11.4.1 in Chromium: ok, 22 nodes. GitHub rendering not checked while private.
