@@ -40,13 +40,13 @@ Demonstrated, within a stated scope.
 | Evidence integrity | Shows no change since sealing, relative to a registry on the same VM. Root could rewrite both |
 | Independent verification | Deterministic checks of this store. Runs on the same VM as the control plane |
 | Isolation | The boundary as configured. Not proof gVisor has no flaws |
-| Human approval | Synthetic orders, fixed demo identity, process separation only. Store, approvals and nonces are in memory, and the signer's key is regenerated at each start |
+| Human approval | Synthetic orders, fixed demo identity, process separation only. Store, approvals and nonces are in memory, and the signer's key is regenerated at each start. Tokens bind run, action and exact cart, not a step number. At-most-once: a retry after a lost response is refused, with no stored receipt |
 | Local test counts: 87/87, 52/52, 6/6 | Local tier, scripted planner, no gVisor |
 | Provider 429, 5xx, timeouts | Against a local mock only. Provider 401 was tested against the real endpoint |
 | Cost: about $0.001 per mission | Calculated at catalog prices from recorded tokens. **Not a bill** |
 | Reboot recovery in 34 seconds | One reboot at `85de6ce` |
 
-| Known issue | `npm audit`: one high advisory in `zod` 4.6.5. Its affected path isn't used by our schemas, by reading the code. Upgrade held with the freeze |
+| Known issue | `npm audit` still reports one high advisory in `zod` 4.6.5. GHSA-mrhx-c7xc-m3w5 remains published, though CVE-2023-54404 was rejected on 28 Oct 2026. Its affected path isn't used by our schemas, by reading the code and a [local test](release-20261105/zod-advisory-assessment.md). Upgrade held with the freeze |
 
 ## REPORTED
 Stated by an agent or a person, without a file here that proves it.
