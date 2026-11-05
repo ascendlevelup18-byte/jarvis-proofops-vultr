@@ -1,0 +1,12 @@
+# npm audit report
+
+zod  <4.6.6
+Severity: high
+Zod can exhaust memory while validating oversized constrained collections - https://github.com/advisories/GHSA-mrhx-c7xc-m3w5
+fix available via `npm audit fix`
+node_modules/zod
+
+1 high severity vulnerability
+
+To address all issues, run:
+  npm audit fix

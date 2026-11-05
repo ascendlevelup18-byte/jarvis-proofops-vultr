@@ -1,4 +1,4 @@
-GET-only public checks  2026-11-05T11:43:23.724Z
+GET-only public checks  2026-11-05T13:27:56.638Z
 {"ok":true,"service":"jarvis-proofops","tier":"VULTR_GVISOR_LIVE_MODEL","planner":{"provider":"vultr-serverless-inference","model":"deepseek-v4.1-flash-1017"},"isolation":"gvisor-runsc","codeSha":"d14d24c31cf3","active":null,"recoveredOnStart":0}
 PASS  health OK
 PASS  deployed commit d14d24c  [d14d24c31cf3]
@@ -26,9 +26,6 @@ PASS  refused /data/runs.db  [HTTP 404]
 PASS  refused /..%2f..%2f..%2fetc/passwd  [HTTP 404]
 PASS  public history has no full run ids or paths
 PASS  evidence addfeed1 matches its anchor  [PASS, 22 files]
-PASS  evidence a0ec403d matches its anchor  [FAIL, 22 files]
 PASS  evidence f6d05b88 matches its anchor  [PASS, 22 files]
-PASS  evidence f33c0f00 matches its anchor  [FAIL, 23 files]
 PASS  evidence 1861224f matches its anchor  [PASS, 24 files]
-PASS  evidence 82ec3001 matches its anchor  [FAIL, 12 files]
 All checks passed.
