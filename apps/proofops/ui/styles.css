@@ -171,3 +171,33 @@ button:disabled { cursor: not-allowed; opacity: 0.5; }
 @media (prefers-reduced-motion: reduce) {
   * { animation: none !important; transition: none !important; }
 }
+
+/* Keep the run workspace readable alongside the mission list on smaller screens. */
+.workspace-label {
+  color: var(--accent);
+  font: 600 11px/1.4 var(--mono);
+  letter-spacing: .14em;
+  text-transform: uppercase;
+  margin-bottom: 10px;
+}
+.layout { max-width: 1600px; margin-inline: auto; grid-template-columns: minmax(265px, 320px) minmax(0, 1fr); }
+.run-head {
+  background: linear-gradient(125deg, var(--panel-2), var(--bg-2));
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: clamp(14px, 2.3vw, 30px);
+  box-shadow: 0 16px 36px rgba(0, 0, 0, .16);
+}
+.run-head h2 { font-size: clamp(21px, 3vw, 36px); line-height: 1.15; }
+#run-id { overflow-wrap: anywhere; }
+@media (max-width: 760px) {
+  .topbar { position: static; }
+  .layout { grid-template-columns: minmax(0, 1fr); }
+  .run-head { flex-wrap: wrap; }
+  .scenario, .primary, .ghost { min-height: 44px; }
+  .chip { white-space: normal; overflow-wrap: anywhere; }
+}
+
+.evidence-check.ghost { color: var(--ink); border-color: var(--line-2); }
+.evidence-check.ghost[data-result="intact"] { color: var(--pass); border-color: var(--pass); }
+.evidence-check.ghost[data-result="problem"] { color: var(--warn); border-color: var(--warn); }

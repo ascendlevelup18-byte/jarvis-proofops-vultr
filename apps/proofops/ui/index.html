@@ -15,7 +15,7 @@
       <span class="mark" aria-hidden="true">◆</span>
       <div>
         <h1>JARVIS ProofOps</h1>
-        <p class="tagline">Execute. Contain. Verify.</p>
+        <p class="tagline">Browser QA · Operator console</p>
       </div>
     </div>
     <ul class="env" id="env" aria-label="Runtime environment"><li class="chip muted">Connecting…</li></ul>
@@ -28,16 +28,17 @@
       <div id="scenario-list" class="scenario-list" role="radiogroup" aria-label="Scenario"></div>
       <button id="run-btn" class="primary" type="button" disabled>Run mission</button>
       <p id="run-error" class="error" role="alert" hidden></p>
-      <h3>Recent runs</h3>
+      <h3>Recent demo runs</h3>
       <ol id="history" class="history"></ol>
     </aside>
 
     <main id="main" class="run" tabindex="-1">
+      <div class="workspace-label">Execution workspace</div>
       <section class="run-head" aria-live="polite">
         <div>
           <p class="eyebrow" id="run-scenario">No mission running</p>
-          <h2 id="run-title">Choose a mission to begin</h2>
-          <p class="mono small" id="run-id"></p>
+          <h2 id="run-title">Verify a storefront workflow</h2>
+          <p class="mono small" id="run-id">Choose a mission to see the agent’s actions and independent checks.</p>
         </div>
         <div class="run-actions">
           <span id="run-status" class="status idle">Idle</span>

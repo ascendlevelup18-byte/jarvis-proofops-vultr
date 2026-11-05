@@ -123,7 +123,10 @@ test("A3 [CHROMIUM] the worker process starts with an allow-listed environment o
   process.env.AWS_SECRET_ACCESS_KEY = "a3-must-not-leak-either";
   const worker = await launchWorker({ kind: "local", runId: "run-a3", proxyUrl: "http://127.0.0.1:9" });
   try {
-    await new Promise((r) => setTimeout(r, 500));
+    const deadline = Date.now() + 5_000;
+    while (!worker.events.some((e) => e.type === "worker.ready") && Date.now() < deadline) {
+      await new Promise((r) => setTimeout(r, 25));
+    }
     const ready = worker.events.find((e) => e.type === "worker.ready") as { envKeys?: string[] } | undefined;
     assert.ok(ready?.envKeys, "worker reports its environment variable names");
     const allowed = new Set(["PROOFOPS_RUN_ID", "PROOFOPS_PROXY", "PROOFOPS_GATEWAY_SOCKET", "PROOFOPS_CHROMIUM_NO_SANDBOX", "HOME", "PATH", "SYSTEMROOT", "LOCALAPPDATA", "USERPROFILE", "PLAYWRIGHT_BROWSERS_PATH", "NODE_ENV"]);

@@ -18,6 +18,7 @@ let scenarios = [];
 let selected = null;
 let current = null; // { runId, stream, screenshots[], containment[], stepsSeen }
 let shotToken = 0;
+let starting = false;
 
 // ---------- environment ----------
 async function loadHealth() {
@@ -51,7 +52,7 @@ function selectScenario(s, focus = false) {
     b.tabIndex = on ? 0 : -1;
     if (on && focus) b.focus();
   }
-  $("run-btn").disabled = Boolean(current?.running);
+  $("run-btn").disabled = starting || Boolean(current?.running);
 }
 
 function renderScenarios() {
@@ -102,6 +103,7 @@ function resetRunView(scenario, runId) {
   shotToken++;
   $("shot").hidden = true;
   $("shot-empty").hidden = false;
+  $("shot-empty").textContent = "Real screenshots from the worker appear here.";
   $("shot-label").textContent = "";
   $("verdict").className = "verdict pending";
   $("verdict").textContent = "Run in progress. The verifier decides at the end.";
@@ -234,6 +236,18 @@ function showApproval(p) {
   $("approve-btn").focus();
 }
 
+function renderArchivedRun(snap) {
+  const verdict = $("verdict");
+  verdict.className = `verdict ${snap.verdict ?? "pending"}`;
+  verdict.textContent = snap.verdict ?? "No sealed verdict";
+  const message = snap.error ?? "This mission is in the durable run registry.";
+  $("timeline").replaceChildren(el("li", "empty", message));
+  $("shot-empty").textContent = "Live preview is unavailable for this run. Check the run evidence below.";
+  $("containment").replaceChildren(el("li", "empty", "See the saved gateway and policy logs for containment details."));
+  if (snap.manifestSha256) renderEvidence(snap.runId, snap.manifestSha256);
+  else $("evidence").replaceChildren(el("li", "empty", "No anchored evidence is available."));
+}
+
 function renderResult(snap) {
   const r = snap.result;
   if (!r) return;
@@ -265,20 +279,26 @@ function renderResult(snap) {
   $("checks").hidden = false;
   stage("verify", r.verdict === "PASS" ? "done" : "bad");
   for (const li of document.querySelectorAll("#pipeline li.active")) li.className = "done"; // nothing is still running once there is a result
+  renderEvidence(snap.runId, r.manifestSha256);
+}
+
+function renderEvidence(runId, manifestSha256) {
   const ev = $("evidence");
   ev.replaceChildren();
-  if (r.manifestSha256) {
-    const seal = el("li", "mono small", `Manifest SHA-256 checksum (anchored outside the bundle): ${r.manifestSha256.slice(0, 32)}…`);
+  if (manifestSha256) {
+    const seal = el("li", "mono small", `Manifest SHA-256 checksum (anchored outside the bundle): ${manifestSha256.slice(0, 32)}…`);
     ev.append(seal);
     const li = el("li");
-    const b = el("button", "ghost", "Re-check evidence integrity");
+    const b = el("button", "ghost evidence-check", "Re-check evidence integrity");
     b.type = "button";
     b.addEventListener("click", async () => {
-      const v = await fetch(`/api/runs/${snap.runId}/verify-evidence`).then((x) => x.json()).catch(() => null);
-      b.textContent = !v ? "Evidence check unreachable"
+      const v = await api(`/api/runs/${runId}/verify-evidence`).catch(() => null);
+      b.dataset.result = v?.ok === true ? "intact" : "problem";
+      b.textContent = !v ? "Evidence is unavailable or the check failed."
         : v.status === "TAMPERED" ? `TAMPERED: ${v.reasons.join("; ")}`
         : v.status === "INCOMPLETE" ? `INCOMPLETE: ${v.reasons.join("; ")}`
-        : `Intact: ${v.files} files match the anchored manifest. Sealed verdict ${v.status}.`;
+        : v.ok === true ? `Intact: ${v.files} files match the anchored manifest. Sealed verdict ${v.status}.`
+        : "Evidence could not be verified.";
     });
     li.append(b);
     ev.append(li);
@@ -287,7 +307,7 @@ function renderResult(snap) {
     ["model-calls.jsonl", "Model calls (redacted)"], ["gateway.jsonl", "Gateway log"], ["server-state.json", "Store server state"], ["cleanup.json", "Teardown record"], ["spec.json", "Frozen spec"]]) {
     const li = el("li");
     const a = el("a", "", label);
-    a.href = `/api/runs/${snap.runId}/evidence/${f}`;
+    a.href = `/api/runs/${runId}/evidence/${f}`;
     a.target = "_blank";
     a.rel = "noopener";
     li.append(a);
@@ -296,14 +316,16 @@ function renderResult(snap) {
 }
 
 async function startRun() {
-  if (!selected) return;
+  if (!selected || starting || current?.running) return;
+  const scenario = selected;
+  starting = true;
   $("run-error").hidden = true;
   $("run-btn").disabled = true;
   try {
-    const { runId, runToken } = await api("/api/runs", { method: "POST", body: JSON.stringify({ scenario: selected.id }), headers: { "idempotency-key": crypto.randomUUID() } });
+    const { runId, runToken } = await api("/api/runs", { method: "POST", body: JSON.stringify({ scenario: scenario.id }), headers: { "idempotency-key": crypto.randomUUID() } });
     current = { runId, running: true, runToken };
-    try { sessionStorage.setItem("proofops.run", JSON.stringify({ runId, runToken, scenarioId: selected.id })); } catch { /* optional */ }
-    resetRunView(selected, runId);
+    try { sessionStorage.setItem("proofops.run", JSON.stringify({ runId, runToken, scenarioId: scenario.id })); } catch { /* optional */ }
+    resetRunView(scenario, runId);
     setStatus("running");
     $("main").focus();
     follow(runId);
@@ -314,7 +336,9 @@ async function startRun() {
       : e instanceof TypeError ? "The control plane is not reachable. Check that it is running."
       : `Could not start the mission (${e.message}).`;
     $("run-error").hidden = false;
-    $("run-btn").disabled = false;
+  } finally {
+    starting = false;
+    $("run-btn").disabled = !selected || Boolean(current?.running);
   }
 }
 
@@ -346,7 +370,27 @@ function follow(runId) {
     loadHistory();
     loadHealth();
   });
-  es.onerror = () => { if (current?.running) $("run-status").textContent = "Reconnecting…"; };
+  es.onerror = async () => {
+    if (current?.stream !== es || !current.running) return;
+    if (es.readyState !== EventSource.CLOSED) {
+      $("run-status").textContent = "Reconnecting…";
+      return;
+    }
+    const saved = await api(`/api/runs/${runId}`).catch(() => null);
+    if (current?.stream !== es || !current.running) return;
+    current.running = false;
+    setStatus(saved?.status ?? "unknown");
+    showApproval(null);
+    $("cancel-btn").hidden = true;
+    $("run-btn").disabled = !selected;
+    if (saved?.result) renderResult(saved);
+    else if (saved?.status && !saved.events) renderArchivedRun(saved);
+    else {
+      $("run-error").textContent = "Live updates are unavailable. Reload to reconnect to this mission.";
+      $("run-error").hidden = false;
+    }
+    loadHistory();
+  };
 }
 
 async function decide(kind) {
@@ -365,7 +409,7 @@ async function decide(kind) {
       missing_ui_header: "The request did not come from this console, so it was refused.",
       not_run_owner: "Only the browser that started this mission can approve it. Nothing was signed.",
     }[e.message];
-    $("run-error").textContent = why ?? `Approval could not be recorded (${e.message}). Nothing was signed.`;
+    $("run-error").textContent = why ?? `Could not confirm the approval response (${e.message}). Check the run timeline before retrying.`;
     $("run-error").hidden = false;
   } finally {
     $("approve-btn").disabled = $("reject-btn").disabled = false;
@@ -390,7 +434,13 @@ $("cancel-btn").addEventListener("click", async () => { if (current) await api(`
     if (saved?.runId) {
       const snap = await api(`/api/runs/${saved.runId}`);
       const scenario = scenarios.find((s) => s.id === saved.scenarioId);
-      if (snap.events && scenario) {
+      if (!snap.events && scenario) {
+        selectScenario(scenario);
+        current = { runId: saved.runId, running: false };
+        resetRunView(scenario, saved.runId);
+        setStatus(snap.status);
+        renderArchivedRun(snap);
+      } else if (snap.events && scenario) {
         selectScenario(scenario);
         current = { runId: saved.runId, running: !snap.result, runToken: saved.runToken };
         resetRunView(scenario, saved.runId);

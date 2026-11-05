@@ -64,9 +64,10 @@ try {
 }
 
 record("secret scan (tracked files)", "REPO", () => {
-  const r = spawnSync("git", ["grep", "-nIE", String.raw`sk-[A-Za-z0-9]{32,}|BEGIN [A-Z ]*PRIVATE KEY|ghp_[A-Za-z0-9]{20,}|github_pat_|sb_secret_|PROOFOPS_INFERENCE_API_KEY=[A-Za-z0-9]`, "--", ".", ":!**/package-lock.json", ":!package-lock.json", ":!apps/proofops/src/release-gate.ts"], { cwd: ROOT, encoding: "utf8" });
-  const hits = (r.stdout ?? "").trim().split("\n").filter(Boolean);
-  return { ok: hits.length === 0, detail: hits.length ? hits.slice(0, 3).join(" | ") : "no secret patterns" };
+  const r = spawnSync("git", ["grep", "-qIE", String.raw`sk-[A-Za-z0-9]{32,}|BEGIN [A-Z ]*PRIVATE KEY|ghp_[A-Za-z0-9]{20,}|github_pat_|sb_secret_|PROOFOPS_INFERENCE_API_KEY=[A-Za-z0-9]`, "--", ".", ":!**/package-lock.json", ":!package-lock.json", ":!apps/proofops/src/release-gate.ts"], { cwd: ROOT, encoding: "utf8" });
+  if (r.status === 1) return { ok: true, detail: "no secret patterns" };
+  if (r.status !== 0) return { ok: false, detail: "git grep could not scan tracked files" };
+  return { ok: false, detail: "secret patterns matched tracked files" };
 });
 
 record("deployment files consistent with code", "STATIC", () => {

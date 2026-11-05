@@ -4,6 +4,10 @@ Entry for the Vultr: Agent Rush Hackathon 2026 (lablab.ai), Challenge 1 "Blast R
 
 **AI proposes. Policy authorizes. The browser acts inside a restricted boundary. Independent verification decides. Evidence proves it.**
 
+## Judge walkthrough
+
+Open the [operator console](https://45-63-82-115.sslip.io). Run **Correct discount**, then **Wrong discount**. Compare the frozen $90 expectation with the observed $95 and open the evidence integrity check. Run **Hostile page** to inspect network refusals. Use **Approved checkout** to review the exact cart and authorize one synthetic order.
+
 ## Status (4 Nov 2026)
 | Tier | Status |
 |---|---|
@@ -39,6 +43,9 @@ bash ops/deploy-app.sh <git-ref> stub <deployment-label> <hostname>  # builds th
 A model id in place of `stub` runs the live planner and needs the inference key installed first with `ops/set-inference-key.ps1`, which reads it from a hidden prompt. The service refuses to start if the key, `runsc` or the worker image is missing. [ops/DAY1-RUNBOOK.md](ops/DAY1-RUNBOOK.md) has the full sequence, including the gVisor boundary probe. [ops/RECOVERY.md](ops/RECOVERY.md) covers failures, the operator commands, the labelled scripted fallback and rollback.
 
 ## Architecture
+
+Caddy terminates HTTPS and streams the same-origin API and operator console from one Node service on the Vultr VM. The frontend is static HTML, CSS and JavaScript in `apps/proofops/ui/`. Live run progress uses Server-Sent Events. The browser worker is a separate disposable process in a gVisor container.
+
 - `apps/proofops/src/server.ts`: control plane and operator API (holds the model key; the worker never does).
 - `model.ts`: planner. Vultr Serverless Inference through the OpenAI-compatible client, or a labelled scripted stub.
 - `policy.ts`: five typed actions, checked before anything reaches the browser.
@@ -49,6 +56,18 @@ A model id in place of `stub` runs the live planner and needs the inference key 
 - `verifier.ts`: judges frozen expectations against the page and the store's own records.
 - `evidence.ts`: per-run bundle with SHA-256 checksums; the manifest hash is anchored outside the bundle.
 - `ops/`: VM bootstrap (Docker, gVisor `runsc`), deploy, systemd, Caddy, and the gVisor boundary probe runbook.
+
+## Persistence and public demo controls
+
+| Data | Storage and lifecycle |
+|---|---|
+| Run status, verdict, idempotency and evidence checksum | SQLite in WAL mode at `/var/lib/proofops/data/runs.db` on the VM. A restart marks interrupted runs failed. |
+| Evidence and approval audit events | Run bundles at `/var/lib/proofops/evidence/`. Completed bundles are sealed and checked against the checksum stored in SQLite. The public service keeps the most recent 300 bundles. |
+| Pending approval, active cart and live stream | Run-scoped memory. Restart ends the run and its authority. The signer binds approvals to a run and cart, and the synthetic storefront enforces single use. |
+
+The public instance allows one active run, six starts per minute per client, and 150 recorded starts per rolling day. The starting browser holds the token needed to approve, reject or cancel. Public history omits full run identifiers and internal paths.
+
+The GitHub release check exercises the local scripted tier on Ubuntu with Chromium. Use the [VM runbook](ops/DAY1-RUNBOOK.md) for sandbox and live-model evidence. The [health endpoint](https://45-63-82-115.sslip.io/api/health) shows the deployed commit, planner and isolation tier without starting a run.
 
 ## Prior work disclosed
 JARVIS ProofOps is a new commerce QA and secure browser-execution product developed for Vultr Agent Rush, built on selected reusable foundations from our earlier JARVIS engineering work. It is not a clean-room implementation, and it is not a renamed ACT III.
