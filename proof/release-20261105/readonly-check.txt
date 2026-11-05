@@ -1,0 +1,31 @@
+Read-only production check  2026-11-05T11:40:34Z
+commit:   d14d24c31cf396efa0eec1e87f8d8107a521a349
+planner:  vultr deepseek-v4.1-flash-1017
+health:   {"ok":true,"service":"jarvis-proofops","tier":"VULTR_GVISOR_LIVE_MODEL","planner":{"provider":"vultr-serverless-inference","model":"deepseek-v4.1-flash-1017"},"isolation":"gvisor-runsc","codeSha":"d14d24c31cf3","active":null,"reco
+services: proofops=active caddy=active docker=active
+workers:  0 containers, 0 socket folders
+key file: proofops mode 600
+missions: 96 in the last 24 hours, cap 150
+disk:     19G 143G 12%
+service up since: Wed 2026-11-04 15:44:48 UTC, restarts 0
+machine up since: 2026-11-04 15:19:22; load 0.00 0.01 0.00; memory free 7302 MiB of 7935; disk 19G 143G 12%
+failed units: 0
+{"level":"error","ts":1793878835.191157,"msg":"adapting config using caddyfile: 
+tags on the VM: 
+rollback commit d14d24c present: commit
+rollback commit e5300f9 present: commit
+worker image: sha256:c1df7ced2a6ce
+sqlite integrity: ok | journal: wal
+registry rows: 96 | last 24h: 96
+evidence classification against anchors: {"PASS":51,"FAIL":36,"no evidence dir (interrupted or refused)":8,"INCOMPLETE":1}
+   f309d701 INCOMPLETE: worker teardown not proven
+evidence dirs on disk: 96 | without a registry row: 0
+
+Runs since the freeze (no action by me):
+  2026-11-05T11:03:28 f1db8729 normal      completed PASS  tier=LIVE_MODEL code=d14d24c runtime=runsc net=none workerGone=true model=deepseek-v4.1-flash-1017 tokens=3748
+  2026-11-05T11:03:53 f6335ab5 wrong-total completed FAIL  tier=LIVE_MODEL code=d14d24c runtime=runsc net=none workerGone=true model=deepseek-v4.1-flash-1017 tokens=3823
+  2026-11-05T11:04:19 585fa1f3 hostile     completed PASS  tier=LIVE_MODEL code=d14d24c runtime=runsc net=none workerGone=true model=deepseek-v4.1-flash-1017 tokens=3938
+  2026-11-05T11:04:54 bdbe0a05 normal      completed PASS  tier=LIVE_MODEL code=d14d24c runtime=runsc net=none workerGone=true model=deepseek-v4.1-flash-1017 tokens=4814
+  2026-11-05T11:05:34 09dd4b7e hang        timed_out FAIL  tier=LIVE_MODEL code=d14d24c runtime=runsc net=none workerGone=true model=deepseek-v4.1-flash-1017 tokens=579
+  tokens since the freeze: 16902, about $0.00307 at catalog prices
+all recorded live calls: 178, tokens 138626, about $0.0252

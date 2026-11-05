@@ -1,0 +1,34 @@
+GET-only public checks  2026-11-05T11:43:23.724Z
+{"ok":true,"service":"jarvis-proofops","tier":"VULTR_GVISOR_LIVE_MODEL","planner":{"provider":"vultr-serverless-inference","model":"deepseek-v4.1-flash-1017"},"isolation":"gvisor-runsc","codeSha":"d14d24c31cf3","active":null,"recoveredOnStart":0}
+PASS  health OK
+PASS  deployed commit d14d24c  [d14d24c31cf3]
+PASS  live-model tier, real provider  [deepseek-v4.1-flash-1017]
+PASS  gVisor reported
+PASS  TLS certificate trusted  [TLSv1.3, valid to Feb  2 10:45:33 2027 GMT]
+PASS  console page loads
+PASS  header strict-transport-security
+PASS  header content-security-policy
+PASS  header x-frame-options
+PASS  header x-content-type-options
+PASS  HTTP redirects to HTTPS  [HTTP 308]
+PASS  port 4317 closed from outside
+PASS  port 4318 closed from outside
+PASS  port 4319 closed from outside
+PASS  port 2019 closed from outside
+PASS  port 3128 closed from outside
+PASS  port 8080 closed from outside
+PASS  port 5432 closed from outside
+PASS  refused /.env  [HTTP 404]
+PASS  refused /.git/config  [HTTP 404]
+PASS  refused /apps/proofops/src/server.ts  [HTTP 404]
+PASS  refused /etc/proofops/inference.env  [HTTP 404]
+PASS  refused /data/runs.db  [HTTP 404]
+PASS  refused /..%2f..%2f..%2fetc/passwd  [HTTP 404]
+PASS  public history has no full run ids or paths
+PASS  evidence addfeed1 matches its anchor  [PASS, 22 files]
+PASS  evidence a0ec403d matches its anchor  [FAIL, 22 files]
+PASS  evidence f6d05b88 matches its anchor  [PASS, 22 files]
+PASS  evidence f33c0f00 matches its anchor  [FAIL, 23 files]
+PASS  evidence 1861224f matches its anchor  [PASS, 24 files]
+PASS  evidence 82ec3001 matches its anchor  [FAIL, 12 files]
+All checks passed.
