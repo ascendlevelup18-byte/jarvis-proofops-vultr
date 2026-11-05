@@ -5,7 +5,7 @@
 | | |
 |---|---|
 | Advisory | [GHSA-mrhx-c7xc-m3w5](https://github.com/advisories/GHSA-mrhx-c7xc-m3w5). **Published, not withdrawn,** read 5 Nov 2026, and `npm audit` still reports it |
-| Linked CVE | CVE-2023-54404. **Rejected by its numbering authority, VulnCheck, on 28 Oct 2026** in the [CVE record](https://cveawg.mitre.org/api/cve/CVE-2023-54404); NVD also shows it as rejected. The stated reason: memory grows only in proportion to input `JSON.parse` already allocated, needs no application request-size limit, and is expected validator behavior. **The rejection doesn't remove the GitHub advisory, and we don't treat it as doing so** |
+| Linked CVE | CVE-2023-54404. **Rejected by its numbering authority, VulnCheck, on 28 Oct 2026** in the [CVE record](https://cveawg.mitre.org/api/cve/CVE-2023-54404); NVD also shows it as rejected. The stated reason: memory grows only in proportion to input `JSON.parse` already allocated, is reachable only without an application request-size limit, and is expected validator behavior. **The rejection doesn't remove the GitHub advisory, and we don't treat it as doing so** |
 | Severity | High, CVSS 7.5, CWE-770, availability only |
 | Affected, fixed | zod below 4.6.6; first patched 4.6.6 |
 | Installed | zod 4.6.5, a direct dependency, at `d14d24c` and on `main` |

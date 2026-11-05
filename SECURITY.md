@@ -20,7 +20,7 @@ Please test only against your own local copy or within the public demo's normal 
 | Browser or renderer exploit | gVisor, no network, non-root, no capabilities, resource caps, disposable worker | 24-point boundary probe | Shared host. gVisor flaws are out of scope of these tests. No penetration test |
 | Exfiltration from the page | Gateway allows only the run's store session; WebRTC UDP locked down | Boundary probe, hostile runs, local tests | A real site with third-party domains would widen this |
 | Cloud metadata access | No network; gateway refuses the metadata address | Boundary probe, hostile runs | |
-| Unapproved order or approval replay | Ed25519 approval from a separate process, bound to run and cart, single-use, verified by the store | Live approved run, public safety test | Fixed demo identity. A compromised control plane could request approvals Execution is at-most-once: a retry after a lost response is refused, with no stored receipt |
+| Unapproved order or approval replay | Ed25519 approval from a separate process, bound to run and cart, single-use, verified by the store | Live approved run, public safety test | Fixed demo identity. A compromised control plane could request approvals. Execution is at-most-once: a retry after a lost response is refused, with no stored receipt |
 | One visitor controlling another's mission | Per-run owner token, UI header | Public safety test | No accounts. Any visitor with a run id can view that run |
 | Spoofed client address | Client address taken from Caddy only | Public safety test | |
 | Key exposure | Key file readable only by the service, never given to the worker, redacted from records | Boundary probe, key scan | Root on the VM can read it |
