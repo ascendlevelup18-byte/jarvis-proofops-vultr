@@ -219,7 +219,7 @@ const server = createServer(async (req, res) => {
     const p = url.pathname;
     if ((req.method === "GET" || req.method === "HEAD") && p === "/api/health") {
       return json(res, 200, { ok: true, service: "jarvis-proofops", tier: TIER, planner: PLANNER === "vultr" ? { provider: "vultr-serverless-inference", model: MODEL } : { provider: "local-model-stub" },
-        isolation: SANDBOX ? "gvisor-runsc" : "none (local development)", codeSha: codeSha.slice(0, 12), active: active?.runId ?? null, recoveredOnStart: recovered });
+        isolation: SANDBOX ? "gvisor-runsc" : "none (local development)", codeSha: codeSha.slice(0, 12), active: active !== null, recoveredOnStart: recovered });
     }
     if (req.method === "GET" && p === "/api/scenarios") return json(res, 200, SCENARIOS);
     // Public history: outcomes only. Full run ids are capabilities for evidence, and paths never leave the server.
@@ -243,7 +243,12 @@ const server = createServer(async (req, res) => {
       const id = m[1]!;
       const sub = m[2] ?? "";
       const live = active?.runId === id ? active : finished.get(id);
-      if (req.method === "GET" && sub === "") return live ? json(res, 200, snapshot(live)) : registry.get(id) ? json(res, 200, { runId: id, status: registry.get(id)!.status, verdict: registry.get(id)!.verdict }) : json(res, 404, { error: "not_found" });
+      if (req.method === "GET" && sub === "") {
+        if (live) return json(res, 200, snapshot(live));
+        const row = registry.get(id);
+        if (!row) return json(res, 404, { error: "not_found" });
+        return json(res, 200, { runId: id, status: row.status, verdict: row.verdict, manifestSha256: row.manifest_sha256 });
+      }
       if (req.method === "GET" && sub === "/stream") {
         if (!live) return json(res, 404, { error: "not_found" });
         if (live.listeners.size >= MAX_LISTENERS) return json(res, 503, { error: "too_many_viewers" });

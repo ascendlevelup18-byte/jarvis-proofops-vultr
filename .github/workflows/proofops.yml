@@ -1,0 +1,26 @@
+name: ProofOps release check
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  local-release:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - run: sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - run: npm ci
+      - run: npm ci --prefix apps/proofops/worker
+      - run: npx playwright install --with-deps chromium
+        working-directory: apps/proofops/worker
+      - run: npm run proofops:release

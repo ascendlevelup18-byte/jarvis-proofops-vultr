@@ -171,3 +171,18 @@ button:disabled { cursor: not-allowed; opacity: 0.5; }
 @media (prefers-reduced-motion: reduce) {
   * { animation: none !important; transition: none !important; }
 }
+
+/* Keep the run workspace readable alongside the mission list on smaller screens. */
+.layout { max-width: 1600px; margin-inline: auto; grid-template-columns: minmax(265px, 320px) minmax(0, 1fr); }
+#run-id { overflow-wrap: anywhere; }
+@media (max-width: 760px) {
+  .topbar { position: static; }
+  .layout { grid-template-columns: minmax(0, 1fr); }
+  .run-head { flex-wrap: wrap; }
+  .scenario, .primary, .ghost { min-height: 44px; }
+  .chip { white-space: normal; overflow-wrap: anywhere; }
+}
+
+.evidence-check.ghost { color: var(--ink); border-color: var(--line-2); }
+.evidence-check.ghost[data-result="intact"] { color: var(--pass); border-color: var(--pass); }
+.evidence-check.ghost[data-result="problem"] { color: var(--warn); border-color: var(--warn); }

@@ -62,7 +62,7 @@ case "$cmd" in
     wait_healthy
     ;;
   clear-workers)
-    if health 2>/dev/null | grep -q '"active":"run_'; then echo "A mission is running. Cancel it or wait; nothing was removed." >&2; exit 1; fi
+    if health 2>/dev/null | grep -qE '"active":(true|"run_)'; then echo "A mission is running. Cancel it or wait; nothing was removed." >&2; exit 1; fi
     ids="$(docker ps -aq --filter label=proofops.run)"
     if [ -n "$ids" ]; then echo "$ids" | xargs docker rm -f; else echo "no leftover workers"; fi
     ;;
