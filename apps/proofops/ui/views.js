@@ -10,6 +10,13 @@ const get = async (path) => {
   return body;
 };
 const RUN_ID = /^run_\d{14}_[0-9a-f]{8,16}$/;
+/** Where finished runs come from. The console uses the control plane; the static Explorer swaps these for published files. */
+export const source = {
+  history: () => get("/api/history"),
+  summary: (id) => get(`/api/runs/${id}/summary`),
+  compare: (a, b) => get(`/api/compare?a=${a}&b=${b}`),
+  file: (id, f) => `/api/runs/${id}/evidence/${f}`,
+};
 const when = (iso) => (iso ? `${iso.slice(0, 10)} ${iso.slice(11, 19)} UTC` : "time not recorded");
 const panel = (title) => {
   const s = el("section", "panel");
@@ -29,7 +36,7 @@ let history = [];
 export async function loadEvidenceList() {
   const list = $("run-list");
   try {
-    history = await get("/api/history");
+    history = await source.history();
   } catch (e) {
     list.replaceChildren(el("li", "empty", e.message === "history_private" ? "Run history isn't open on this deployment." : "Run history couldn't be loaded."));
     $("compare-form").hidden = true;
@@ -78,12 +85,13 @@ export async function openRun(id, { focus = true } = {}) {
   out.replaceChildren(empty("Loading the sealed record…"));
   let s;
   try {
-    s = await get(`/api/runs/${id}/summary`);
+    s = await source.summary(id);
   } catch (e) {
     out.replaceChildren(empty(e.status === 404 ? "This server has no record of that run." : e.status === 409 ? "This run is still in progress. Follow it under Run." : "The run's record couldn't be loaded."));
     return;
   }
   renderRun(out, s);
+  document.dispatchEvent(new CustomEvent("proofops:run-opened", { detail: s }));
   if (focus) { $("evidence-heading").focus({ preventScroll: true }); $("evidence-detail").scrollIntoView({ block: "start" }); }
 }
 
@@ -200,7 +208,7 @@ function renderRun(out, s) {
     const row = el("div", "gallery");
     for (const f of s.screenshots) {
       const a = el("a");
-      a.href = `/api/runs/${s.runId}/evidence/${f}`;
+      a.href = source.file(s.runId, f);
       a.target = "_blank";
       a.rel = "noopener";
       const img = el("img");
@@ -229,7 +237,7 @@ function renderRun(out, s) {
   const links = el("ul", "evidence");
   for (const f of s.evidence.available) {
     const a = el("a", "", f);
-    a.href = `/api/runs/${s.runId}/evidence/${f}`;
+    a.href = source.file(s.runId, f);
     a.target = "_blank";
     a.rel = "noopener";
     const li = el("li");
@@ -250,7 +258,7 @@ export async function openCompare(a, b) {
   out.replaceChildren(empty("Comparing the sealed records…"));
   let c;
   try {
-    c = await get(`/api/compare?a=${a}&b=${b}`);
+    c = await source.compare(a, b);
   } catch (e) {
     out.replaceChildren(empty(e.status === 409 ? "One of these runs is still in progress." : "These runs couldn't be compared."));
     return;

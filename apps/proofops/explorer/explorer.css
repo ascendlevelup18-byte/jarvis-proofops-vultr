@@ -1,0 +1,26 @@
+/* Evidence Explorer additions, on top of the console's styles. */
+.hero { background: linear-gradient(180deg, rgba(56, 189, 248, 0.09), rgba(56, 189, 248, 0.02)); border: 1px solid var(--line-2); border-radius: var(--radius); padding: 22px 24px; margin-bottom: 22px; }
+.hero h2 { font-size: 26px; margin: 2px 0 8px; letter-spacing: -0.02em; }
+.hero-copy { margin: 0 0 14px; font-size: 16px; color: var(--ink); max-width: 74ch; }
+.hero-actions { display: flex; flex-wrap: wrap; gap: 10px; }
+.hero-btn { display: inline-flex; align-items: center; justify-content: center; text-decoration: none; width: auto; min-height: 44px; }
+.hero-btn.ghost { color: var(--ink); }
+.hero-btn.ghost:hover { border-color: var(--accent); color: var(--accent); }
+.nav.ext { margin-left: auto; }
+code { font-family: var(--mono); font-size: 0.92em; }
+.check-actions { display: flex; flex-wrap: wrap; gap: 10px; }
+.check-actions .primary { width: auto; }
+.check-actions .ghost { color: var(--ink); }
+.check-actions .ghost:hover { border-color: var(--warn); color: var(--warn); }
+.check-result { margin-top: 12px; }
+.check-result:empty { margin-top: 0; }
+.check-result p { margin: 0 0 4px; }
+.check-title { font-weight: 700; font-size: 14px; overflow-wrap: anywhere; }
+.check-result[data-state="match"] .check-title { color: var(--pass); }
+.check-result[data-state="mismatch"] .check-title { color: var(--fail); }
+@media (max-width: 760px) {
+  .hero { padding: 16px; }
+  .hero h2 { font-size: 22px; }
+  .hero-btn, .check-actions button { width: 100%; }
+  .nav.ext { margin-left: 0; }
+}

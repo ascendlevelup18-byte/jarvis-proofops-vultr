@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self'; style-src 'self'; script-src 'self'; connect-src 'self'; base-uri 'none'; form-action 'none'">
+  <meta name="referrer" content="no-referrer">
+  <title>Evidence Explorer · JARVIS ProofOps</title>
+  <meta name="description" content="Recorded evidence from JARVIS ProofOps live-model runs on Vultr. Open a run, compare two, and re-check the checksums in your browser.">
+  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="explorer.css">
+  <script type="module" src="explorer.js"></script>
+</head>
+<body>
+  <a class="skip" href="#content">Skip to content</a>
+  <header class="topbar">
+    <div class="brand">
+      <span class="mark" aria-hidden="true">◆</span>
+      <div>
+        <h1>JARVIS ProofOps</h1>
+        <p class="tagline">Evidence Explorer</p>
+      </div>
+    </div>
+    <nav class="nav ext" aria-label="Project links">
+      <a href="https://45-63-82-115.sslip.io" rel="noopener">Live demo</a>
+      <a href="https://github.com/ascendlevelup18-byte/jarvis-proofops-vultr" rel="noopener">Source</a>
+      <a href="https://lablab.build/ai-hackathons/vultr-hackathon/jarvis-proofops/jarvis-proofops" rel="noopener">Entry</a>
+    </nav>
+  </header>
+
+  <div id="content" tabindex="-1">
+    <main class="view evidence-view" id="view-evidence">
+      <section class="hero" aria-labelledby="hero-h">
+        <p class="eyebrow">Recorded runs, not a live system</p>
+        <h2 id="hero-h">An agent can reach checkout and still be wrong.</h2>
+        <p class="hero-copy">A live model on Vultr finished this checkout. The store recorded <strong>$95</strong> against a <strong>$90</strong> expectation frozen before the run, so the independent verifier failed it.</p>
+        <div class="hero-actions">
+          <a class="primary hero-btn" id="open-wrong" href="#evidence/run_20261104154518_b6a586f4a0ec403d">See that failure</a>
+          <a class="ghost hero-btn" id="open-compare" href="#compare/run_20261104154509_8ec3eec5addfeed1/run_20261104154518_b6a586f4a0ec403d">Compare it with a correct run</a>
+        </div>
+      </section>
+
+      <h2 id="evidence-heading" tabindex="-1">Six sealed live-model runs</h2>
+      <p class="lead">Recorded on 4 Nov 2026 at release <code>d14d24c</code>, on a Vultr VM with gVisor and <code>deepseek-v4.1-flash-1017</code>. The store is synthetic. Three runs are designed to fail or time out.</p>
+      <div class="evidence-layout">
+        <aside aria-label="Finished runs">
+          <form id="compare-form" class="compare-form" hidden>
+            <label for="compare-a">Compare run A</label>
+            <select id="compare-a"></select>
+            <label for="compare-b">with run B</label>
+            <select id="compare-b"></select>
+            <button class="ghost" type="submit">Compare</button>
+          </form>
+          <ol id="run-list" class="run-list"><li class="empty">Loading runs…</li></ol>
+        </aside>
+        <div id="evidence-detail" class="evidence-detail"><p class="empty">Open a run to inspect it, or choose two to compare.</p></div>
+      </div>
+    </main>
+  </div>
+
+  <footer class="foot">
+    <p>Evidence is SHA-256 checksums and a separately recorded manifest hash, not signatures. Someone who controlled the host could have rewritten both. This site calls no server, model or store, and it's built separately from the frozen release it documents.</p>
+  </footer>
+</body>
+</html>
