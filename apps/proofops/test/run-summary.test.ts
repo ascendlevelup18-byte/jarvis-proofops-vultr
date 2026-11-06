@@ -188,3 +188,18 @@ test("KNOWN LIMIT: someone who rewrites files, manifest and anchor together isn'
     assert.equal(s.outcomeClass, "verified_success"); // Checksums, not signatures. This test documents the limit; it isn't a goal.
   } finally { t.done(); }
 });
+
+test("mission outcome and evidence integrity are separate facts", () => {
+  const wrong = sealed(RUNS.wrong);
+  assert.equal(wrong.missionOutcome, "DESIGNED FAIL");
+  assert.equal(wrong.evidence.integrity_status, "ANCHOR VERIFIED");
+  const none = readRunSummary({ runId: RUNS.correct, dir: join(LIVE, RUNS.correct), source: "archive" });
+  assert.equal(none.evidence.integrity_status, "INCOMPLETE");
+  const t = tempCopy(RUNS.correct);
+  try {
+    writeFileSync(join(t.dir, "report.md"), "edited");
+    const s = readRunSummary({ runId: RUNS.correct, dir: t.dir, anchor: anchors[RUNS.correct], source: "archive" });
+    assert.equal(s.evidence.integrity_status, "TAMPERED");
+    assert.equal(s.missionOutcome, "NOT RELIABLE");
+  } finally { t.done(); }
+});

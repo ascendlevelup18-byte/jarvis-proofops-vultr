@@ -58,8 +58,8 @@ export function renderOutcome(node, s) {
   const meta = el("ul", "outcome-meta");
   meta.setAttribute("aria-label", "Recorded facts");
   meta.append(
-    el("li", "", `Sealed verdict: ${s.verdict ?? "none"}`),
-    el("li", s.evidence?.status === "TAMPERED" ? "bad" : "", `Evidence: ${s.evidence?.status ?? "unknown"}${s.evidence && !s.evidence.anchored ? ", no recorded anchor" : ""}`),
+    el("li", "", `Mission outcome: ${s.missionOutcome ?? s.verdict ?? "none"}`),
+    el("li", s.evidence?.status === "TAMPERED" ? "bad" : "", `Evidence integrity: ${s.evidence?.integrity_status ?? s.evidence?.status ?? "unknown"}${s.evidence && !s.evidence.anchored ? ", no recorded anchor" : ""}`),
     el("li", "", plannerLabel(s.model?.provider, s.model?.requested)),
     el("li", "", tierLabel(s.tier)),
   );

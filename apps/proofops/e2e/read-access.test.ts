@@ -3,7 +3,8 @@
 import { test, before, after } from "node:test";
 import assert from "node:assert/strict";
 import { spawn, type ChildProcess } from "node:child_process";
-import { cpSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync } from "node:fs";
+import { createHash } from "node:crypto";
+import { cpSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, symlinkSync, writeFileSync } from "node:fs";
 import { request } from "node:http";
 import { createRequire } from "node:module";
 import { tmpdir } from "node:os";
@@ -209,4 +210,61 @@ test("SEC-11 [CHROMIUM] an archive with no recorded anchors shows as incomplete,
     assert.match(text, /no recorded anchor/);
     assert.doesNotMatch(text, /Intact|Verified success|failed as intended/);
   } finally { await browser.close(); child.kill(); }
+});
+
+test("SEC-12 [CHROMIUM] hostile text in recorded evidence stays text in the console: no script runs and no unsafe link appears", async () => {
+  const arch = join(work, "hostile");
+  const bundle = join(arch, SEALED);
+  cpSync(join(LIVE, SEALED), bundle, { recursive: true });
+  const XSS = '<img src=x onerror="window.__pwned=1"><script>window.__pwned=2</script>';
+  const decisions = readFileSync(join(bundle, "policy-decisions.jsonl"), "utf8").trim().split("\n").map((l) => JSON.parse(l));
+  decisions[0].proposal.reason = XSS;
+  decisions[0].result = "javascript:window.__pwned=3";
+  decisions[1].decision = { decision: "deny", rule: "<b onmouseover=window.__pwned=4>x</b>", detail: "x" };
+  writeFileSync(join(bundle, "policy-decisions.jsonl"), decisions.map((d) => JSON.stringify(d)).join("\n"));
+  const gw = readFileSync(join(bundle, "gateway.jsonl"), "utf8").trim().split("\n");
+  gw.push(JSON.stringify({ decision: "deny", reason: XSS, method: "GET", target: "javascript:window.__pwned=5" }));
+  writeFileSync(join(bundle, "gateway.jsonl"), gw.join("\n"));
+  const sha = (b: Buffer | string) => createHash("sha256").update(b).digest("hex");
+  const m = JSON.parse(readFileSync(join(bundle, "manifest.json"), "utf8"));
+  for (const rel of Object.keys(m.files)) m.files[rel] = sha(readFileSync(join(bundle, rel)));
+  const text = JSON.stringify(m, null, 2);
+  writeFileSync(join(bundle, "manifest.json"), text);
+  writeFileSync(join(arch, "ANCHORS.txt"), SEALED + " " + sha(text));
+  const p = free();
+  const child = await startServer(p, "hostile", ["--archive", arch]);
+  const require = createRequire(join(ROOT, "apps/proofops/worker/package.json"));
+  const browser = await (require("playwright") as any).chromium.launch();
+  try {
+    const page = await browser.newPage();
+    await page.goto("http://127.0.0.1:" + p + "/#evidence/" + SEALED);
+    await page.waitForSelector("#evidence-detail .outcome");
+    assert.ok((await page.locator("#evidence-detail").innerText()).includes("onerror="));
+    const state = await page.evaluate(() => ({ pwned: (window as any).__pwned, injected: document.querySelectorAll("#evidence-detail img[src='x'], #evidence-detail script, #evidence-detail [onerror], #evidence-detail [onmouseover]").length, bad: [...document.querySelectorAll("a[href]")].filter((x) => !/^https?:$/.test((x as HTMLAnchorElement).protocol)).length }));
+    assert.deepEqual(state, { pwned: undefined, injected: 0, bad: 0 });
+  } finally { await browser.close(); child.kill(); }
+});
+
+test("SEC-13 a link inside a bundle can't serve a file from outside it", async (t) => {
+  const arch = join(work, "linked");
+  const bundle = join(arch, SEALED);
+  cpSync(join(LIVE, SEALED), bundle, { recursive: true });
+  const secret = join(work, "outside");
+  mkdirSync(secret, { recursive: true });
+  writeFileSync(join(secret, "secret.txt"), "must not be served");
+  try {
+    symlinkSync(secret, join(bundle, "linked"), "junction");
+  } catch (e) {
+    t.skip("this system refused to create the link: " + (e as Error).message);
+    return;
+  }
+  cpSync(join(LIVE, "ANCHORS.txt"), join(arch, "ANCHORS.txt"));
+  const p = free();
+  const child = await startServer(p, "linked", ["--archive", arch]);
+  try {
+    const r = await fetch("http://127.0.0.1:" + p + "/api/runs/" + SEALED + "/evidence/linked/secret.txt");
+    assert.equal(r.status, 404);
+    assert.doesNotMatch(await r.text(), /must not be served/);
+    assert.equal((await fetch("http://127.0.0.1:" + p + "/api/runs/" + SEALED + "/evidence/report.md")).status, 200);
+  } finally { child.kill(); }
 });

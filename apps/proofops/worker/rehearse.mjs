@@ -67,7 +67,7 @@ async function mission(title, shotName, expect) {
   const fails = [];
   if (expect.verifyShot) {
     await page.locator("#evidence button").click();
-    await page.locator("#evidence button", { hasText: "Intact" }).waitFor({ timeout: 15_000 });
+    await page.locator("#evidence button", { hasText: "Checksums match" }).waitFor({ timeout: 15_000 });
     await page.evaluate(() => document.getElementById("evidence").scrollIntoView({ block: "center" }));
     await page.waitForTimeout(300);
     await page.screenshot({ path: join(out, expect.verifyShot) });

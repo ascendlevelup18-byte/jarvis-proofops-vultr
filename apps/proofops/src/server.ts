@@ -2,10 +2,10 @@
 // live progress with Server-Sent Events. Holds the model key (if any); the browser worker never sees it.
 //   node apps/proofops/src/server.ts [--port 4317] [--planner stub|vultr --model <id>] [--sandbox]
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
-import { readFile, stat } from "node:fs/promises";
+import { readFile, realpath, stat } from "node:fs/promises";
 import { readFileSync, readdirSync, mkdirSync, existsSync } from "node:fs";
 import { execFileSync } from "node:child_process";
-import { join, normalize, extname, resolve } from "node:path";
+import { join, normalize, extname, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { createHash, randomBytes, timingSafeEqual } from "node:crypto";
 import type { AddressInfo } from "node:net";
@@ -230,9 +230,12 @@ const readLimited = (req: IncomingMessage) => overLimit(readsPerIp, req, HASHING
 
 async function serveFile(res: ServerResponse, base: string, rel: string) {
   const full = normalize(join(base, rel));
-  if (!full.startsWith(base)) return json(res, 403, { error: "forbidden" });
+  if (full !== base && !full.startsWith(base + sep)) return json(res, 403, { error: "forbidden" });
   try {
     if (!(await stat(full)).isFile()) throw new Error();
+    // A link inside the folder must not lead out of it.
+    const realBase = await realpath(base);
+    if (!(await realpath(full)).startsWith(realBase + sep)) throw new Error();
     res.writeHead(200, { "content-type": MIME[extname(full)] ?? "application/octet-stream", "cache-control": "no-store", ...SECURITY_HEADERS });
     res.end(await readFile(full));
   } catch {
@@ -275,7 +278,7 @@ const server = createServer(async (req, res) => {
     if (req.method === "GET" && p === "/api/history") {
       if (!historyAllowed(req)) return json(res, 403, { error: "history_private" });
       if (readLimited(req)) return json(res, 429, { error: "rate_limited" });
-      const ids = [...registry.list(30).map((r) => r.id).filter((id) => !runIsLive(id)), ...[...archive.keys()].filter((id) => !registry.get(id)).sort().reverse()];
+      const ids = [...registry.list(30).map((r) => r.id).filter((id) => !runIsLive(id)), ...[...archive.keys()].filter((id) => !registry.get(id)).sort().reverse()].slice(0, 100);
       return json(res, 200, ids.map((id) => summaryOf(id)).filter((x): x is RunSummary => x !== null).map((x) => ({
         runId: x.runId, source: x.source, title: x.mission?.title ?? x.mode, tier: x.tier, status: x.status, verdict: x.verdict, outcomeClass: x.outcomeClass,
         evidenceStatus: x.evidence.status, provider: x.model?.provider ?? null, model: x.model?.requested ?? null, at: x.startedAt,

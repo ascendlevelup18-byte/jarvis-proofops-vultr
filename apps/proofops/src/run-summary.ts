@@ -49,6 +49,21 @@ export function classifyOutcome(i: OutcomeInput): OutcomeClass {
   return "incomplete_evidence";
 }
 
+export type MissionOutcome = "PASS" | "DESIGNED FAIL" | "FAIL" | "TIMED OUT" | "CANCELLED" | "INCOMPLETE" | "NOT RELIABLE";
+export type IntegrityStatus = "ANCHOR VERIFIED" | "INCOMPLETE" | "TAMPERED";
+
+/** What the mission did. Says nothing about whether its evidence is intact. */
+export function missionOutcomeOf(c: OutcomeClass): MissionOutcome {
+  return ({ verified_success: "PASS", designed_negative: "DESIGNED FAIL", unexpected_failure: "FAIL", unexpected_result: "FAIL", timed_out: "TIMED OUT", cancelled: "CANCELLED", incomplete_evidence: "INCOMPLETE", evidence_integrity_failure: "NOT RELIABLE" } as const)[c];
+}
+
+/** Whether the files match their checksums and recorded hash. Says nothing about whether the mission succeeded. */
+export function integrityOf(evidenceStatus: EvidenceStatus, anchored: boolean): IntegrityStatus {
+  if (evidenceStatus === "TAMPERED") return "TAMPERED";
+  if (evidenceStatus === "INCOMPLETE" || !anchored) return "INCOMPLETE";
+  return "ANCHOR VERIFIED";
+}
+
 export interface SummaryStep {
   step: number;
   tool: string | null;
@@ -68,6 +83,7 @@ export interface RunSummary {
   status: string | null;
   verdict: string | null;
   outcomeClass: OutcomeClass;
+  missionOutcome: MissionOutcome;
   error: string | null;
   tier: string | null;
   codeSha: string | null;
@@ -85,7 +101,7 @@ export interface RunSummary {
   containment: { kind: "network" | "policy" | "limit"; text: string; detail: string | null }[];
   approval: { requested: boolean; cart: unknown; payloadSha256: string | null; granted: boolean; refused: boolean; replayStatus: number | null; replayRefused: boolean | null } | null;
   screenshots: string[];
-  evidence: { status: EvidenceStatus; reasons: string[]; integrity: string; files: number; manifestSha256: string | null; anchored: boolean; available: string[] };
+  evidence: { status: EvidenceStatus; integrity_status: IntegrityStatus; reasons: string[]; integrity: string; files: number; manifestSha256: string | null; anchored: boolean; available: string[] };
   notRetained: string[];
 }
 
@@ -213,7 +229,7 @@ export function readRunSummary(opts: { runId: string; dir: string | null; anchor
   return {
     runId, source,
     mission: scenario ? { id: scenario.id, title: scenario.title, purpose: scenario.purpose, expected: scenario.expected } : null,
-    task: clip(spec?.task, 500), status, verdict, outcomeClass,
+    task: clip(spec?.task, 500), status, verdict, outcomeClass, missionOutcome: missionOutcomeOf(outcomeClass),
     error: clip(manifest?.error ?? registry?.error, 300),
     tier: clip(manifest?.tier ?? registry?.tier, 40), codeSha: clip(manifest?.codeSha, 64), deployment: clip(manifest?.deployment, 80), mode,
     startedAt: started ?? registry?.createdAt ?? null, finishedAt: finished ?? registry?.updatedAt ?? null, durationMs, outcomes,
@@ -223,7 +239,7 @@ export function readRunSummary(opts: { runId: string; dir: string | null; anchor
     model, steps, containment: containment.slice(0, 60), approval,
     screenshots: files.filter((f) => /^screenshots\/[A-Za-z0-9._-]{1,80}$/.test(f)),
     evidence: {
-      status: evidenceStatus, reasons: reasons.slice(0, 12).map((r) => r.slice(0, 200)), integrity: classified.integrity, files: classified.files,
+      status: evidenceStatus, integrity_status: integrityOf(evidenceStatus, typeof anchor === "string"), reasons: reasons.slice(0, 12).map((r) => r.slice(0, 200)), integrity: classified.integrity, files: classified.files,
       manifestSha256: anchor ?? null, anchored: typeof anchor === "string",
       available: files.filter((f) => /^[A-Za-z0-9._-]{1,80}\.(json|jsonl|md)$/.test(f)).concat(files.includes("manifest.json") || (bundle && existsSync(join(bundle, "manifest.json"))) ? ["manifest.json"] : []),
     },
@@ -255,9 +271,10 @@ export function compareRuns(a: RunSummary, b: RunSummary): RunComparison {
     rows.push({ group, field, a: left, b: right, differs: left !== right });
   };
   add("Result", "Outcome", a.outcomeClass, b.outcomeClass);
-  add("Result", "Sealed verdict", a.verdict, b.verdict);
+  add("Result", "Mission outcome", a.missionOutcome, b.missionOutcome);
+  add("Result", "Recorded verdict", a.verdict, b.verdict);
   add("Result", "Run status", a.status, b.status);
-  add("Result", "Evidence status", a.evidence.status, b.evidence.status);
+  add("Result", "Evidence integrity", a.evidence.integrity_status, b.evidence.integrity_status);
   add("Mission", "Mission", a.mission?.title, b.mission?.title);
   add("Mission", "Store fixture", a.mode, b.mode);
   add("Mission", "Tier", a.tier, b.tier);

@@ -18,32 +18,50 @@
       <span class="mark" aria-hidden="true">◆</span>
       <div>
         <h1>JARVIS ProofOps</h1>
-        <p class="tagline">Evidence Explorer</p>
+        <p class="tagline">Execute. Contain. Verify.</p>
       </div>
     </div>
-    <nav class="nav ext" aria-label="Project links">
-      <a href="https://45-63-82-115.sslip.io" rel="noopener">Live demo</a>
-      <a href="https://github.com/ascendlevelup18-byte/jarvis-proofops-vultr" rel="noopener">Source</a>
-      <a href="https://lablab.build/ai-hackathons/vultr-hackathon/jarvis-proofops/jarvis-proofops" rel="noopener">Entry</a>
+    <nav class="nav" aria-label="Evidence Explorer">
+      <a href="#story" data-view="story">Story</a>
+      <a href="#evidence" data-view="runs">Runs</a>
+      <a href="#library" data-view="library">Library</a>
+      <a href="#method" data-view="method">Method</a>
     </nav>
+    <p class="recorded-flag">Recorded evidence — not a live execution.</p>
   </header>
 
   <div id="content" tabindex="-1">
-    <main class="view evidence-view" id="view-evidence">
+    <main class="view" id="view-story">
       <section class="hero" aria-labelledby="hero-h">
-        <p class="eyebrow">Recorded runs, not a live system</p>
-        <h2 id="hero-h">An agent can reach checkout and still be wrong.</h2>
-        <p class="hero-copy">A live model on Vultr finished this checkout. The store recorded <strong>$95</strong> against a <strong>$90</strong> expectation frozen before the run, so the independent verifier failed it.</p>
-        <div class="hero-actions">
-          <a class="primary hero-btn" id="open-wrong" href="#evidence/run_20261104154518_b6a586f4a0ec403d">See that failure</a>
-          <a class="ghost hero-btn" id="open-compare" href="#compare/run_20261104154509_8ec3eec5addfeed1/run_20261104154518_b6a586f4a0ec403d">Compare it with a correct run</a>
-        </div>
+        <h2 id="hero-h" tabindex="-1">An agent can reach checkout and still be wrong.</h2>
+        <p class="hero-copy">A model's report that a task is done isn't proof of the business result. So in ProofOps, the model only proposes, separate code decides, the browser runs in isolation, and an independent check reads the store's own records.</p>
+        <ol class="planes" aria-label="The four operational planes">
+          <li><strong>AI proposal</strong><span>A live model proposes one of five typed actions.</span></li>
+          <li><strong>Deterministic authorization</strong><span>Policy code decides. A person approves the exact cart for any order.</span></li>
+          <li><strong>Isolated execution</strong><span>Chromium in gVisor, with no network except a gateway limited to this run's store.</span></li>
+          <li><strong>Independent verification and evidence</strong><span>Store records are compared with expectations frozen before the run, and every file is checksummed.</span></li>
+        </ol>
       </section>
 
-      <h2 id="evidence-heading" tabindex="-1">Six sealed live-model runs</h2>
-      <p class="lead">Recorded on 4 Nov 2026 at release <code>d14d24c</code>, on a Vultr VM with gVisor and <code>deepseek-v4.1-flash-1017</code>. The store is synthetic. Three runs are designed to fail or time out.</p>
+      <section aria-labelledby="sig-h" class="signature-section">
+        <h2 id="sig-h">The same task. The model reached checkout both times.</h2>
+        <div id="signature" class="signature"><p class="empty">Loading the two recorded runs…</p></div>
+        <p class="why"><strong>Why the failing run matters:</strong> a check that can't fail proves nothing. This store is deliberately broken to apply $5 off instead of $10, to show the verifier catches what the agent doesn't report.</p>
+        <p><a class="primary hero-btn" href="#compare/run_20261104154509_8ec3eec5addfeed1/run_20261104154518_b6a586f4a0ec403d">See the full side-by-side record</a></p>
+      </section>
+
+      <section aria-labelledby="six-h">
+        <h2 id="six-h">Six recorded live-model scenarios</h2>
+        <p class="lead">Recorded on 4 Nov 2026 at release <code>d14d24c</code>, on a Vultr VM with gVisor and <code>deepseek-v4.1-flash-1017</code>, against a synthetic store. Three are designed to fail or time out, so not all six should pass.</p>
+        <ul id="scenario-grid" class="scenario-grid"><li class="empty">Loading scenarios…</li></ul>
+      </section>
+    </main>
+
+    <main class="view evidence-view" id="view-runs" hidden>
+      <h2 id="evidence-heading" tabindex="-1">Runs</h2>
+      <p class="lead">Each run shows what was recorded. Its mission outcome and its evidence integrity are separate results.</p>
       <div class="evidence-layout">
-        <aside aria-label="Finished runs">
+        <aside aria-label="Recorded runs">
           <form id="compare-form" class="compare-form" hidden>
             <label for="compare-a">Compare run A</label>
             <select id="compare-a"></select>
@@ -56,10 +74,77 @@
         <div id="evidence-detail" class="evidence-detail"><p class="empty">Open a run to inspect it, or choose two to compare.</p></div>
       </div>
     </main>
+
+    <main class="view" id="view-library" hidden>
+      <h2 id="library-heading" tabindex="-1">Evidence library</h2>
+      <p class="lead">Every recorded bundle in the evidence tag. These are summaries: only the six featured runs open here, and the others link to their files on GitHub.</p>
+      <p id="lib-tally" class="tally" role="status"></p>
+      <form id="lib-filters" class="lib-filters">
+        <div><label for="lib-search">Search</label><input id="lib-search" type="search" autocomplete="off"></div>
+        <div><label for="lib-outcome">Outcome</label><select id="lib-outcome"><option value="">All</option><option>PASS</option><option>DESIGNED FAIL</option><option>FAIL</option><option>INCOMPLETE</option></select></div>
+        <div><label for="lib-integrity">Integrity</label><select id="lib-integrity"><option value="">All</option><option>ANCHOR VERIFIED</option><option>NO ANCHOR</option><option>TAMPERED</option></select></div>
+      </form>
+      <div class="table-wrap" tabindex="0" role="region" aria-label="Evidence library table">
+        <table class="checks library">
+          <thead><tr><th scope="col">Mission</th><th scope="col">Outcome</th><th scope="col">Integrity at build</th><th scope="col">Evidence set</th><th scope="col">Code</th><th scope="col">Files</th><th scope="col">Evidence</th></tr></thead>
+          <tbody id="lib-rows"></tbody>
+        </table>
+      </div>
+      <p id="lib-empty" class="empty" hidden>No bundles match these filters.</p>
+    </main>
+
+    <main class="view" id="view-method" hidden>
+      <h2 id="method-heading" tabindex="-1">How to read this evidence</h2>
+      <div class="method-grid">
+        <section class="panel">
+          <h3>What the mechanism is</h3>
+          <p class="body-copy">Unkeyed SHA-256 file checksums, with a separately recorded hash of each manifest as its anchor.</p>
+          <ul class="plain">
+            <li>No HMAC.</li>
+            <li>No KMS signature.</li>
+            <li>No off-host immutable attestation.</li>
+          </ul>
+          <p class="body-copy">Someone who could rewrite both the files and the anchor could defeat this. The check shows consistency, not who produced the files.</p>
+        </section>
+        <section class="panel">
+          <h3>Two separate results</h3>
+          <dl class="facts wide">
+            <dt>Mission outcome</dt><dd>PASS, DESIGNED FAIL or INCOMPLETE. What the verifier recorded about the task.</dd>
+            <dt>Evidence integrity</dt><dd>ANCHOR VERIFIED, INCOMPLETE or TAMPERED. Whether the files match their checksums and recorded hash.</dd>
+          </dl>
+          <p class="body-copy">A designed FAIL with verified evidence is a good result: the system caught the fault, and the record is consistent.</p>
+        </section>
+        <section class="panel">
+          <h3>Provenance</h3>
+          <ul class="plain links">
+            <li><a href="https://github.com/ascendlevelup18-byte/jarvis-proofops-vultr/tree/release-20261104" rel="noopener">Frozen release <code>release-20261104</code>, commit <code>d14d24c</code></a></li>
+            <li><a href="https://github.com/ascendlevelup18-byte/jarvis-proofops-vultr/tree/evidence-20261105/proof" rel="noopener">Evidence tag <code>evidence-20261105</code>, commit <code>35e201d</code></a></li>
+            <li><a href="https://github.com/ascendlevelup18-byte/jarvis-proofops-vultr/blob/evidence-20261105/REUSE-LEDGER.md" rel="noopener">Reuse ledger for earlier work</a></li>
+          </ul>
+          <p class="body-copy">This site is built separately from the frozen release it documents. The live demo doesn't contain this Explorer.</p>
+        </section>
+        <section class="panel">
+          <h3>Check it from a clone</h3>
+          <p class="body-copy">Needs Node 24 and no install:</p>
+          <pre class="command-line" tabindex="0"><code>git clone https://github.com/ascendlevelup18-byte/jarvis-proofops-vultr
+cd jarvis-proofops-vultr
+node --no-warnings proof/verify-all.mjs</code></pre>
+        </section>
+        <section class="panel">
+          <h3>What this doesn't show</h3>
+          <ul class="plain">
+            <li>It's a synthetic store, not a real merchant, with no real payments.</li>
+            <li>The model ignoring a hostile page in recorded runs isn't a measured resistance rate.</li>
+            <li>The scripted forced-proposal test is separate from the live runs. The live model didn't make those proposals.</li>
+            <li>No third party has audited this system.</li>
+          </ul>
+        </section>
+      </div>
+    </main>
   </div>
 
   <footer class="foot">
-    <p>Evidence is SHA-256 checksums and a separately recorded manifest hash, not signatures. Someone who controlled the host could have rewritten both. This site calls no server, model or store, and it's built separately from the frozen release it documents.</p>
+    <p>This site calls no server, model or store. <a href="https://45-63-82-115.sslip.io" rel="noopener">Live demo</a> · <a href="https://github.com/ascendlevelup18-byte/jarvis-proofops-vultr" rel="noopener">Source</a> · <a href="https://lablab.build/ai-hackathons/vultr-hackathon/jarvis-proofops/jarvis-proofops" rel="noopener">Competition entry</a></p>
   </footer>
 </body>
 </html>

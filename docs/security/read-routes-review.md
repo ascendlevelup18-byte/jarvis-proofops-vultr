@@ -26,3 +26,24 @@
 
 ## Not tested
 Behavior under `--sandbox` on a VM, real proxy configurations, or abuse at volume.
+
+## Findings against the reported tickets, on this branch
+Argon's six tickets weren't available as a file here, so these use the descriptions given by the owner. Argon hadn't inspected this branch.
+| Ticket | Result | Evidence |
+|---|---|---|
+| CC-01 object-level authorization | **Confirmed for any public use.** No users or ownership exist. Mitigated by keeping history local and closed. No fake session field was added | Finding 1, SEC-1, SEC-2, SEC-10 |
+| CC-02 XSS and unsafe content | **Not confirmed.** Recorded text is inserted as text, and links come from fixed patterns | SEC-12, EX-13 |
+| CC-03 evidence terminology | **Partly confirmed.** No false signing claim, but "sealed" suggested more than a checksum. Replaced in the UI, and outcome and integrity are now separate. Existing check names and historical records keep their wording | EX-3, EX-9 |
+| CC-04 path traversal, resource use | **One gap confirmed and fixed:** the folder check used a prefix test and followed links. Now real paths are compared. History and comparison sizes are bounded | SEC-3, SEC-5, SEC-13 |
+| CC-05 zod | **Fixed on this branch,** at 4.6.6. Frozen production keeps 4.6.5, as disclosed | `npm audit` |
+| GW-01, GW-02 UX | Checked by automated accessibility, keyboard and viewport tests, not by a person using a screen reader | MC and EX tests |
+
+## Endpoints on this branch
+| Route | Who can read | Limit | Data |
+|---|---|---|---|
+| `/api/history` | Direct local request only, unless explicitly opened | 240 a minute | Run ids and outcomes |
+| `/api/runs/:id/summary`, `/verify-evidence`, `/evidence/*` | Anyone holding a run id | 240 a minute, except files | Synthetic store data, model text, screenshots, deployment address |
+| `/api/compare` | Anyone holding both ids | 240 a minute | As above |
+| `/api/trust`, `/api/health`, `/api/scenarios`, `/api/runs` | Anyone reaching the server | None | Configuration, limits and outcome list. No secrets |
+
+**The history and evidence routes stay local-only until real authentication and owner-scoped access exist.** The static Explorer uses none of them.

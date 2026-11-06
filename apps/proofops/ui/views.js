@@ -52,7 +52,7 @@ export async function loadEvidenceList() {
     a.dataset.run = r.runId;
     const top = el("span", "run-row-top");
     top.append(el("strong", "", r.title ?? "Unknown mission"), el("span", `pill ${o.tone}`, o.label.split(":")[0]));
-    a.append(top, el("span", "run-row-meta", `${when(r.at)} · ${plannerLabel(r.provider, r.model)}${r.source === "archive" ? " · sealed archive" : ""}`));
+    a.append(top, el("span", "run-row-meta", `${when(r.at)} · ${plannerLabel(r.provider, r.model)}${r.source === "archive" ? " · recorded archive" : ""}`));
     const li = el("li");
     li.append(a);
     list.append(li);
@@ -82,7 +82,7 @@ export async function openRun(id, { focus = true } = {}) {
   const out = $("evidence-detail");
   markSelected(id);
   if (!RUN_ID.test(id)) { out.replaceChildren(empty("That isn't a valid run id.")); return; }
-  out.replaceChildren(empty("Loading the sealed record…"));
+  out.replaceChildren(empty("Loading the recorded evidence…"));
   let s;
   try {
     s = await source.summary(id);
@@ -98,7 +98,7 @@ export async function openRun(id, { focus = true } = {}) {
 function renderRun(out, s) {
   out.replaceChildren();
   const head = el("header", "detail-head");
-  head.append(el("p", "eyebrow", s.source === "archive" ? "Sealed archive" : "Run registry"), el("h3", "detail-title", s.mission?.title ?? s.mode ?? "Unknown mission"), el("p", "mono small", s.runId));
+  head.append(el("p", "eyebrow", s.source === "archive" ? "Recorded archive" : "Run registry"), el("h3", "detail-title", s.mission?.title ?? s.mode ?? "Unknown mission"), el("p", "mono small", s.runId));
   const banner = el("div");
   banner.setAttribute("role", "status");
   renderOutcome(banner, s);
@@ -224,7 +224,7 @@ function renderRun(out, s) {
 
   const ev = panel("Evidence");
   ev.append(factList([
-    ["Status", s.evidence.status],
+    ["Evidence integrity", s.evidence.integrity_status],
     ["What was checked", s.evidence.integrity],
     ["Files with checksums", s.evidence.files],
     ["Recorded manifest hash", s.evidence.manifestSha256 ? `${s.evidence.manifestSha256.slice(0, 32)}…` : "none recorded"],
@@ -255,7 +255,7 @@ export async function openCompare(a, b) {
   markSelected(null);
   if (!RUN_ID.test(a) || !RUN_ID.test(b)) { out.replaceChildren(empty("Choose two finished runs to compare.")); return; }
   if (a === b) { out.replaceChildren(empty("Choose two different runs to compare.")); return; }
-  out.replaceChildren(empty("Comparing the sealed records…"));
+  out.replaceChildren(empty("Comparing the recorded evidence…"));
   let c;
   try {
     c = await source.compare(a, b);
@@ -341,7 +341,7 @@ export async function loadTrust() {
     ["Browser isolation", t.isolation],
     ["Silent fallback to scripted", t.silentFallback ? "yes" : "no: if the planner fails, the run fails"],
     ["Code", t.codeSha],
-    ["Sealed runs available to inspect", t.archivedRuns],
+    ["Recorded runs available to inspect", t.archivedRuns],
   ]));
   out.append(now);
 

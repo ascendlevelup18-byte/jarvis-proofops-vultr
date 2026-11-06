@@ -23,28 +23,57 @@ export async function startSigner(): Promise<SignerHandle> {
     stdio: ["pipe", "pipe", "inherit"],
   });
   const lines = createInterface({ input: child.stdout! });
-  const pending = new Map<number, (r: { token?: string; error?: string }) => void>();
+  const pending = new Map<number, { resolve: (token: string) => void; reject: (e: Error) => void; timer: ReturnType<typeof setTimeout> }>();
   let nextId = 1;
+  let closed: Error | null = null;
+  let startupReject: ((e: Error) => void) | undefined;
+  const fail = (error: Error) => {
+    if (closed) return;
+    closed = error;
+    startupReject?.(error);
+    for (const p of pending.values()) { clearTimeout(p.timer); p.reject(error); }
+    pending.clear();
+    child.kill();
+  };
+  child.on("error", (e) => fail(e));
+  child.on("exit", () => fail(new Error("signer exited")));
+  child.stdin!.on("error", () => fail(new Error("signer pipe closed")));
+  lines.on("close", () => fail(new Error("signer output closed")));
   const publicKeyPem = await new Promise<string>((resolve, reject) => {
-    const t = setTimeout(() => reject(new Error("signer did not start")), 10_000);
-    lines.once("line", (l) => { clearTimeout(t); resolve((JSON.parse(l) as { publicKeyPem: string }).publicKeyPem); });
+    const t = setTimeout(() => fail(new Error("signer did not start")), 10_000);
+    startupReject = (e) => { clearTimeout(t); reject(e); };
+    lines.once("line", (l) => {
+      try {
+        const m = JSON.parse(l);
+        if (typeof m.publicKeyPem !== "string") throw new Error("invalid signer startup reply");
+        createPublicKey(m.publicKeyPem);
+        clearTimeout(t); startupReject = undefined; resolve(m.publicKeyPem);
+      } catch { fail(new Error("invalid signer startup reply")); }
+    });
   });
   lines.on("line", (l) => {
-    const m = JSON.parse(l) as { id: number; token?: string; error?: string };
-    pending.get(m.id)?.(m);
-    pending.delete(m.id);
+    try {
+      const m = JSON.parse(l) as { id: number; token?: string; error?: string };
+      const p = pending.get(m.id);
+      if (!p) return;
+      clearTimeout(p.timer); pending.delete(m.id);
+      if (typeof m.token === "string") p.resolve(m.token);
+      else p.reject(new Error(m.error ?? "sign failed"));
+    } catch { fail(new Error("invalid signer reply")); }
   });
   return {
     publicKey: createPublicKey(publicKeyPem),
     pid: child.pid,
     sign(req) {
+      if (closed) return Promise.reject(closed);
       const id = nextId++;
       return new Promise((resolve, reject) => {
-        pending.set(id, (r) => (r.token ? resolve(r.token) : reject(new Error(r.error ?? "sign failed"))));
-        child.stdin!.write(JSON.stringify({ id, ...req }) + "\n");
+        const timer = setTimeout(() => fail(new Error("signer request timed out")), 10_000);
+        pending.set(id, { resolve, reject, timer });
+        child.stdin!.write(JSON.stringify({ id, ...req }) + "\n", (e) => { if (e) fail(e); });
       });
     },
-    stop: () => child.kill(),
+    stop: () => fail(new Error("signer stopped")),
   };
 }
 

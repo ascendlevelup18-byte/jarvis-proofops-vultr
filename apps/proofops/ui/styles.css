@@ -290,3 +290,9 @@ button:disabled { cursor: not-allowed; opacity: 0.5; }
   .gallery img { width: 140px; height: 88px; }
   .outcome-label { font-size: 19px; }
 }
+
+/* From Work's audit branch, reviewed: grid children may shrink, long labels wrap, reduced motion also stops smooth scrolling. */
+.layout > *, .grid > * { min-width: 0; }
+.run-head .mono, .chip, .approval .mono { overflow-wrap: anywhere; }
+.chip { white-space: normal; }
+@media (prefers-reduced-motion: reduce) { * { scroll-behavior: auto !important; } }

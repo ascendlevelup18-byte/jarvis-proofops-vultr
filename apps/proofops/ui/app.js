@@ -242,7 +242,7 @@ function showApproval(p) {
   $("approve-btn").focus();
 }
 
-/** States the finished run's outcome where it can't be missed, using its sealed record. */
+/** States the finished run's outcome where it can't be missed, using its recorded evidence. */
 async function showOutcome(runId, verdict, { reveal = true } = {}) {
   const box = $("outcome");
   let summary = null;
@@ -266,7 +266,7 @@ async function showOutcome(runId, verdict, { reveal = true } = {}) {
 function renderArchivedRun(snap) {
   const verdict = $("verdict");
   verdict.className = `verdict ${snap.verdict ?? "pending"}`;
-  verdict.textContent = snap.verdict ?? "No sealed verdict";
+  verdict.textContent = snap.verdict ?? "No recorded verdict";
   const message = snap.error ?? "This mission is in the durable run registry.";
   $("timeline").replaceChildren(el("li", "empty", message));
   $("shot-empty").textContent = "Live preview is unavailable for this run. Check the run evidence below.";
@@ -326,7 +326,7 @@ function renderEvidence(runId, manifestSha256) {
       b.textContent = !v ? "Evidence is unavailable or the check failed."
         : v.status === "TAMPERED" ? `TAMPERED: ${v.reasons.join("; ")}`
         : v.status === "INCOMPLETE" ? `INCOMPLETE: ${v.reasons.join("; ")}`
-        : v.ok === true ? `Intact: ${v.files} files match the anchored manifest. Sealed verdict ${v.status}.`
+        : v.ok === true ? `Checksums match: ${v.files} files match the recorded manifest hash. Recorded verdict ${v.status}.`
         : "Evidence could not be verified.";
     });
     li.append(b);
