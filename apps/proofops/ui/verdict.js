@@ -63,7 +63,7 @@ export function renderOutcome(node, s) {
   node.dataset.outcome = s.outcomeClass;
   const showReasons = s.outcomeClass === "incomplete_evidence" || s.outcomeClass === "evidence_integrity_failure";
   const reasons = showReasons && s.evidence?.reasons?.length ? s.evidence.reasons.slice(0, 3).join("; ") : null;
-  const line = headline(s);
+  const line = s.outcomeClass === "order_not_approved" ? null : headline(s);
   node.replaceChildren(
     el("p", "outcome-label", o.label),
     el("p", "outcome-sub", reasons ?? line ?? o.sub),

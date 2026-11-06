@@ -97,7 +97,7 @@ async function loadHistory() {
 
 // ---------- run lifecycle ----------
 function resetRunView(scenario, runId) {
-  $("run-scenario").textContent = `Mission · ${scenario.title}`;
+  $("run-scenario").textContent = scenario.id === "live-task" ? "Live task" : `Mission · ${scenario.title}`;
   $("run-title").textContent = scenario.purpose;
   $("run-id").textContent = runId;
   $("timeline").replaceChildren();
@@ -183,6 +183,7 @@ function addNote(tag, text) {
   const li = el("li", "step note");
   li.append(el("div", "tag", tag), el("div", "why", text));
   $("timeline").append(li);
+  $("timeline").scrollTop = $("timeline").scrollHeight;
 }
 
 function addContainment(text, detail, kind = "policy") {
@@ -385,12 +386,12 @@ async function startRun() {
 
 // ---------- Live Tasks ----------
 const LIVE_TASK = (text) => ({ id: "live-task", title: "Live task", purpose: text });
-function showUnderstood(understood, userText) {
+function showUnderstood(understood, userText, plannerTask) {
   const li = el("li", "step goal");
   li.append(el("div", "goal-title", "JARVIS: I understand your task."), el("div", "why", `You asked: "${userText}"`));
   const ul = el("ul", "goal-list");
   for (const line of understood) ul.append(el("li", "", line));
-  li.append(ul, el("div", "why", "This goal is frozen before the model starts. The model gets only this goal, not your original text."));
+  li.append(ul, el("div", "why", `GOAL sent to the planner: ${plannerTask}`), el("div", "why", "This goal is frozen before the planner starts. The planner gets only this goal, not your original text, and it can't change what's verified."));
   $("timeline").prepend(li);
 }
 async function runTask(e) {
@@ -405,8 +406,8 @@ async function runTask(e) {
     const r = await api("/api/tasks", { method: "POST", body: JSON.stringify({ text }), headers: { "idempotency-key": crypto.randomUUID() } });
     current = { runId: r.runId, running: true, runToken: r.runToken, live: true };
     try { sessionStorage.setItem("proofops.run", JSON.stringify({ runId: r.runId, runToken: r.runToken, scenarioId: "live-task", plannerTask: r.plannerTask, understood: r.understood, userText: r.userText })); } catch { /* optional */ }
-    resetRunView(LIVE_TASK(r.plannerTask), r.runId);
-    showUnderstood(r.understood, r.userText);
+    resetRunView(LIVE_TASK(r.userText), r.runId);
+    showUnderstood(r.understood, r.userText, r.plannerTask);
     setStatus("running");
     $("run-title").scrollIntoView({ block: "start" });
     follow(r.runId);
@@ -552,19 +553,19 @@ $("cancel-btn").addEventListener("click", async () => { if (current) await api(`
     if (saved?.runId) {
       const snap = await api(`/api/runs/${saved.runId}`);
       const live = saved.scenarioId === "live-task";
-      const scenario = live ? LIVE_TASK(saved.plannerTask) : scenarios.find((s) => s.id === saved.scenarioId);
+      const scenario = live ? LIVE_TASK(saved.userText) : scenarios.find((s) => s.id === saved.scenarioId);
       if (!snap.events && scenario) {
         if (!live) selectScenario(scenario);
         current = { runId: saved.runId, running: false, live };
         resetRunView(scenario, saved.runId);
-        if (live) showUnderstood(saved.understood, saved.userText);
+        if (live) showUnderstood(saved.understood, saved.userText, saved.plannerTask);
         setStatus(snap.status);
         renderArchivedRun(snap);
       } else if (snap.events && scenario) {
         if (!live) selectScenario(scenario);
         current = { runId: saved.runId, running: !snap.result, runToken: saved.runToken, live };
         resetRunView(scenario, saved.runId);
-        if (live) showUnderstood(saved.understood, saved.userText);
+        if (live) showUnderstood(saved.understood, saved.userText, saved.plannerTask);
         setStatus(snap.status);
         follow(saved.runId);
         $("run-btn").disabled = current.running;

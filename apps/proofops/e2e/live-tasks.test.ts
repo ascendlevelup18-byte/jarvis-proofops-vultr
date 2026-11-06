@@ -250,6 +250,22 @@ test("LT-14 [CHROMIUM] the timeline shows real steps from the run, matching the 
   assert.ok(s.steps.length >= 3);
   assert.match(shown[0], /fill/);
   assert.equal(s.userText, "Add 2 jackets and stop at the cart.");
+  assert.match(await page.locator("#timeline").innerText(), /VERIFIER[\s\S]*RESULT\s+VERIFIED PASS/);
+  assert.equal(await page.locator("#run-title").innerText(), "Add 2 jackets and stop at the cart.");
+  await ctx.close();
+});
+
+test("LT-14b [CHROMIUM] a reload during approval reconnects to the task, and the approval still works", async () => {
+  const { ctx, page } = await open(1366, 768);
+  await page.fill("#task-text", "Buy one jacket with SAVE10.");
+  await page.locator("#task-run").click();
+  await page.waitForSelector("#approval:not([hidden])", { timeout: 60_000 });
+  await page.reload();
+  await page.waitForSelector("#approval:not([hidden])", { timeout: 20_000 });
+  assert.match(await page.locator(".goal").innerText(), /I understand your task/);
+  await page.locator("#approve-btn").click();
+  await page.waitForSelector("#outcome:not([hidden]) .outcome-link", { timeout: 60_000 });
+  assert.match(await page.locator("#outcome").innerText(), /VERIFIED PASS/);
   await ctx.close();
 });
 
