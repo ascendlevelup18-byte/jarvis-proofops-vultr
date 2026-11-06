@@ -3,7 +3,7 @@
 //   node apps/proofops/src/server.ts [--port 4317] [--planner stub|vultr --model <id>] [--sandbox]
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { readFile, stat } from "node:fs/promises";
-import { readFileSync, mkdirSync, existsSync } from "node:fs";
+import { readFileSync, readdirSync, mkdirSync, existsSync } from "node:fs";
 import { execFileSync } from "node:child_process";
 import { join, normalize, extname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -12,10 +12,12 @@ import type { AddressInfo } from "node:net";
 import { createStorefront } from "./storefront.ts";
 import { startSigner } from "./signer.ts";
 import { stubPlanner, vultrPlanner, type Planner } from "./model.ts";
-import { runScenario, type ApprovalRequest, type RunConfig, type Tier } from "./runner.ts";
+import { runScenario, RUN_LIMITS, type ApprovalRequest, type RunConfig, type Tier } from "./runner.ts";
 import { SCENARIOS, findScenario, type Scenario } from "./scenarios.ts";
 import { RunStore } from "./store.ts";
 import { classifyEvidence, pruneEvidence } from "./evidence.ts";
+import { Action } from "./policy.ts";
+import { compareRuns, readRunSummary, type RunSummary } from "./run-summary.ts";
 
 const arg = (name: string, fallback?: string) => {
   const i = process.argv.indexOf(`--${name}`);
@@ -36,6 +38,23 @@ const EVIDENCE_ROOT = resolve(ROOT, arg("evidence", SANDBOX ? "evidence" : "evid
 const DATA_DIR = resolve(ROOT, arg("data", "data-local")!);
 mkdirSync(EVIDENCE_ROOT, { recursive: true });
 mkdirSync(DATA_DIR, { recursive: true });
+// Listing full run ids makes every bundle reachable, so history is off behind a proxy unless explicitly opened.
+const OPEN_HISTORY = process.env.PROOFOPS_OPEN_HISTORY === "1" || (!TRUST_PROXY && (HOST === "127.0.0.1" || HOST === "localhost" || HOST === "::1"));
+// Read-only archived bundles, such as the sealed live runs in this repository. Never written to or pruned.
+const ARCHIVE_DIRS = (arg("archive", SANDBOX ? "" : "proof/vultr-live-20261104/runs-d14d24c") ?? "").split(",").map((d) => d.trim()).filter(Boolean).map((d) => resolve(ROOT, d));
+const RUN_DIR = /^run_\d{14}_[0-9a-f]{8,16}$/;
+const archive = new Map<string, { dir: string; anchor: string | undefined }>();
+for (const root of ARCHIVE_DIRS) {
+  if (!existsSync(root)) continue;
+  const anchors = new Map<string, string>();
+  try {
+    for (const line of readFileSync(join(root, "ANCHORS.txt"), "utf8").split("\n")) {
+      const [id, hash] = line.trim().split(/\s+/);
+      if (id && hash) anchors.set(id, hash);
+    }
+  } catch { /* no anchors recorded: the summary says the check ran against the manifest only */ }
+  for (const name of readdirSync(root)) if (RUN_DIR.test(name)) archive.set(name, { dir: join(root, name), anchor: anchors.get(name) });
+}
 
 let codeSha = "unknown";
 try { codeSha = execFileSync("git", ["rev-parse", "HEAD"], { cwd: ROOT, encoding: "utf8" }).trim(); } catch { /* not a checkout */ }
@@ -207,6 +226,18 @@ async function serveFile(res: ServerResponse, base: string, rel: string) {
   }
 }
 
+/** Summary of a finished run from its sealed files, or null if this server has never heard of it. */
+function summaryOf(id: string): RunSummary | null {
+  const row = registry.get(id);
+  if (row) {
+    return readRunSummary({ runId: id, dir: row.evidence_dir, anchor: row.manifest_sha256, source: "registry",
+      registry: { status: row.status, verdict: row.verdict, error: row.error, tier: row.tier, mode: row.mode, createdAt: row.created_at, updatedAt: row.updated_at } });
+  }
+  const a = archive.get(id);
+  return a ? readRunSummary({ runId: id, dir: a.dir, anchor: a.anchor, source: "archive" }) : null;
+}
+const runIsLive = (id: string) => active?.runId === id;
+
 const ownerOk = (req: IncomingMessage, live: Live | undefined | null) => {
   const given = Buffer.from(String(req.headers["x-run-token"] ?? ""));
   const want = Buffer.from(live?.ownerToken ?? "");
@@ -225,6 +256,38 @@ const server = createServer(async (req, res) => {
     // Public history: outcomes only. Full run ids are capabilities for evidence, and paths never leave the server.
     if (req.method === "GET" && p === "/api/runs") {
       return json(res, 200, registry.list(30).map((r) => ({ ref: r.id.slice(-8), mode: r.mode, tier: r.tier, status: r.status, verdict: r.verdict, at: r.created_at })));
+    }
+    // Read-only history of finished runs: the registry's, then any archived bundles. Newest first.
+    if (req.method === "GET" && p === "/api/history") {
+      if (!OPEN_HISTORY) return json(res, 403, { error: "history_private" });
+      const ids = [...registry.list(30).map((r) => r.id).filter((id) => !runIsLive(id)), ...[...archive.keys()].filter((id) => !registry.get(id)).sort().reverse()];
+      return json(res, 200, ids.map((id) => summaryOf(id)).filter((x): x is RunSummary => x !== null).map((x) => ({
+        runId: x.runId, source: x.source, title: x.mission?.title ?? x.mode, tier: x.tier, status: x.status, verdict: x.verdict, outcomeClass: x.outcomeClass,
+        evidenceStatus: x.evidence.status, provider: x.model?.provider ?? null, model: x.model?.requested ?? null, at: x.startedAt,
+      })));
+    }
+    if (req.method === "GET" && p === "/api/compare") {
+      const a = url.searchParams.get("a") ?? "";
+      const b = url.searchParams.get("b") ?? "";
+      if (!RUN_DIR.test(a) || !RUN_DIR.test(b)) return json(res, 400, { error: "bad_run_id" });
+      if (runIsLive(a) || runIsLive(b)) return json(res, 409, { error: "run_not_finished" });
+      const sa = summaryOf(a);
+      const sb = summaryOf(b);
+      if (!sa || !sb) return json(res, 404, { error: "not_found" });
+      return json(res, 200, compareRuns(sa, sb));
+    }
+    // What this deployment actually enforces, read from the running code and configuration.
+    if (req.method === "GET" && p === "/api/trust") {
+      return json(res, 200, {
+        tier: TIER, codeSha: codeSha.slice(0, 12), isolation: SANDBOX ? "gvisor-runsc" : "none (local development)",
+        planner: PLANNER === "vultr" ? { provider: "vultr-serverless-inference", model: MODEL, live: true } : { provider: "local-model-stub", model: "scripted", live: false },
+        silentFallback: false, actions: Action.options.map((o) => o.shape.tool.value),
+        limits: { ...RUN_LIMITS, activeMissions: 1, missionsPerRollingDay: MAX_RUNS_PER_DAY, startsPerMinutePerAddress: RUNS_PER_MINUTE, evidenceBundlesKept: EVIDENCE_KEEP },
+        missions: SCENARIOS.map((x) => ({ title: x.title, wallClockSeconds: x.wallClockMs / 1000, approval: x.approvals, expected: x.expected })),
+        evidence: "Unkeyed SHA-256 file checksums and a separately recorded manifest hash. Not signatures. Someone who controls this host could rewrite both.",
+        approvals: "Ed25519 token from a separate signer process, bound to the run, the action and the exact cart, usable once. Held in memory, so a restart ends it.",
+        openHistory: OPEN_HISTORY, archivedRuns: archive.size,
+      });
     }
     if (req.method === "POST" && p === "/api/runs") {
       if (!sameOrigin(req)) return json(res, 403, { error: "missing_ui_header" });
@@ -248,6 +311,11 @@ const server = createServer(async (req, res) => {
         const row = registry.get(id);
         if (!row) return json(res, 404, { error: "not_found" });
         return json(res, 200, { runId: id, status: row.status, verdict: row.verdict, manifestSha256: row.manifest_sha256 });
+      }
+      if (req.method === "GET" && sub === "/summary") {
+        if (runIsLive(id)) return json(res, 409, { error: "run_not_finished" });
+        const summary = summaryOf(id);
+        return summary ? json(res, 200, summary) : json(res, 404, { error: "not_found" });
       }
       if (req.method === "GET" && sub === "/stream") {
         if (!live) return json(res, 404, { error: "not_found" });
@@ -289,12 +357,15 @@ const server = createServer(async (req, res) => {
       if (req.method === "GET" && sub === "/verify-evidence") {
         // Re-hashes the bundle on disk and compares it with the manifest hash anchored in the registry.
         const row = registry.get(id);
-        if (!row?.evidence_dir) return json(res, 404, { error: "not_found" });
-        const c = classifyEvidence(row.evidence_dir, row.manifest_sha256);
-        return json(res, 200, { ...c, runId: id, anchoredManifestSha256: row.manifest_sha256, kind: "sha256-checksum (not a signature)", ok: c.status === "PASS" || c.status === "FAIL" });
+        const arch = row ? undefined : archive.get(id);
+        const dir = row?.evidence_dir ?? arch?.dir;
+        if (!dir) return json(res, 404, { error: "not_found" });
+        const anchor = row ? row.manifest_sha256 : arch?.anchor;
+        const c = classifyEvidence(dir, anchor);
+        return json(res, 200, { ...c, runId: id, anchoredManifestSha256: anchor ?? null, kind: "sha256-checksum (not a signature)", ok: c.status === "PASS" || c.status === "FAIL" });
       }
       const f = /^\/evidence\/([A-Za-z0-9._/-]{1,120})$/.exec(sub);
-      if (req.method === "GET" && f && !f[1]!.includes("..")) return serveFile(res, join(EVIDENCE_ROOT, id), f[1]!);
+      if (req.method === "GET" && f && !f[1]!.includes("..")) return serveFile(res, archive.get(id)?.dir ?? join(EVIDENCE_ROOT, id), f[1]!);
       return json(res, 404, { error: "not_found" });
     }
     if (req.method === "GET" || req.method === "HEAD") return serveFile(res, UI_DIR, p === "/" ? "index.html" : p.slice(1));

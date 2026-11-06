@@ -9,7 +9,7 @@
   <script type="module" src="app.js"></script>
 </head>
 <body>
-  <a class="skip" href="#main">Skip to run</a>
+  <a class="skip" href="#content">Skip to content</a>
   <header class="topbar">
     <div class="brand">
       <span class="mark" aria-hidden="true">◆</span>
@@ -18,90 +18,130 @@
         <p class="tagline">Execute. Contain. Verify.</p>
       </div>
     </div>
+    <nav class="nav" aria-label="Primary">
+      <a href="#run" data-view="run">Run</a>
+      <a href="#evidence" data-view="evidence">Evidence</a>
+      <a href="#trust" data-view="trust">Trust</a>
+    </nav>
     <ul class="env" id="env" aria-label="Runtime environment"><li class="chip muted">Connecting…</li></ul>
   </header>
 
-  <div class="layout">
-    <aside class="missions" aria-labelledby="missions-h">
-      <h2 id="missions-h">Missions</h2>
-      <p class="hint">Pick a synthetic store scenario. The <span id="proposer">planner</span> proposes, policy decides, the browser executes, and an independent verifier decides the result.</p>
-      <div id="scenario-list" class="scenario-list" role="radiogroup" aria-label="Scenario"></div>
-      <button id="run-btn" class="primary" type="button" disabled>Run mission</button>
-      <p id="run-error" class="error" role="alert" hidden></p>
-      <h3>Recent demo runs</h3>
-      <ol id="history" class="history"></ol>
-    </aside>
-
-    <main id="main" class="run" tabindex="-1">
-      <section class="run-head" aria-live="polite">
-        <div>
-          <p class="eyebrow" id="run-scenario">No mission running</p>
-          <h2 id="run-title">Verify a storefront workflow</h2>
-          <p class="mono small" id="run-id">Choose a mission to see the agent’s actions and independent checks.</p>
+  <div id="content" tabindex="-1">
+    <div class="layout" id="view-run">
+      <aside class="missions" aria-labelledby="missions-h">
+        <h2 id="missions-h">Missions</h2>
+        <div class="command">
+          <p class="command-label">Selected: <strong id="selected-mission">none</strong></p>
+          <button id="run-btn" class="primary" type="button" disabled>Run mission</button>
+          <p id="run-error" class="error" role="alert" hidden></p>
         </div>
-        <div class="run-actions">
-          <span id="run-status" class="status idle">Idle</span>
-          <button id="cancel-btn" class="ghost" type="button" hidden>Cancel run</button>
+        <div id="scenario-list" class="scenario-list" role="radiogroup" aria-label="Scenario"></div>
+        <p class="hint">Synthetic store. The <span id="proposer">planner</span> proposes, policy decides, the browser executes, and an independent verifier decides the result.</p>
+        <h3>Recent runs</h3>
+        <ol id="history" class="history"></ol>
+        <a class="all-runs" href="#evidence">Open and compare runs</a>
+      </aside>
+
+      <main id="main" class="run" tabindex="-1">
+        <section class="run-head" aria-live="polite">
+          <div>
+            <p class="eyebrow" id="run-scenario">No mission running</p>
+            <h2 id="run-title">Verify a storefront workflow</h2>
+            <p class="mono small" id="run-id">Choose a mission to see the agent’s actions and independent checks.</p>
+          </div>
+          <div class="run-actions">
+            <span id="run-status" class="status idle">Idle</span>
+            <button id="cancel-btn" class="ghost" type="button" hidden>Cancel run</button>
+          </div>
+        </section>
+
+        <div id="outcome" class="outcome" role="status" tabindex="-1" hidden></div>
+
+        <ol class="pipeline" id="pipeline" aria-label="Execution pipeline">
+          <li data-stage="propose"><span class="dot"></span><span id="stage-propose">Planner proposes</span></li>
+          <li data-stage="policy"><span class="dot"></span><span>Policy decides</span></li>
+          <li data-stage="execute"><span class="dot"></span><span>Browser executes</span></li>
+          <li data-stage="verify"><span class="dot"></span><span>Verifier decides</span></li>
+          <li data-stage="evidence"><span class="dot"></span><span>Evidence sealed</span></li>
+          <li data-stage="teardown"><span class="dot"></span><span>Worker destroyed</span></li>
+        </ol>
+
+        <section id="approval" class="approval" hidden aria-labelledby="approval-h">
+          <h3 id="approval-h">Operator approval required</h3>
+          <p>The agent wants to <strong id="approval-element">place the order</strong>. Approve only this exact cart. The signed approval is single-use, bound to this run and cart, and the store verifies it itself.</p>
+          <dl class="cart" id="approval-cart"></dl>
+          <p class="mono small">Cart hash <span id="approval-hash"></span></p>
+          <div class="row">
+            <button id="approve-btn" class="primary" type="button">Approve this order</button>
+            <button id="reject-btn" class="ghost" type="button">Reject</button>
+          </div>
+        </section>
+
+        <div class="grid">
+          <section class="panel timeline-panel" aria-labelledby="timeline-h">
+            <h3 id="timeline-h">Decision timeline</h3>
+            <ol id="timeline" class="timeline"><li class="empty">Steps appear here as the agent works.</li></ol>
+          </section>
+
+          <section class="panel browser-panel" aria-labelledby="browser-h">
+            <h3 id="browser-h">Browser view <span class="small muted" id="shot-label"></span></h3>
+            <figure class="shot">
+              <img id="shot" alt="Latest screenshot from the browser worker" hidden>
+              <figcaption id="shot-empty" class="empty">Real screenshots from the worker appear here.</figcaption>
+            </figure>
+            <div id="thumbs" class="thumbs" role="group" aria-label="All screenshots"></div>
+          </section>
+
+          <section class="panel verify-panel" aria-labelledby="verify-h">
+            <h3 id="verify-h">Independent verification</h3>
+            <div id="verdict" class="verdict pending">Waiting for the run</div>
+            <ul id="outcomes" class="outcomes"></ul>
+            <div class="table-wrap">
+              <table class="checks" id="checks" hidden>
+                <caption class="sr">Assertions, expected values frozen before the first model call</caption>
+                <thead><tr><th scope="col">Check</th><th scope="col">Expected</th><th scope="col">Observed</th><th scope="col">Result</th></tr></thead>
+                <tbody></tbody>
+              </table>
+            </div>
+          </section>
+
+          <section class="panel contain-panel" aria-labelledby="contain-h">
+            <h3 id="contain-h">Containment</h3>
+            <ul id="containment" class="containment"><li class="empty">Blocked requests and refused actions appear here.</li></ul>
+            <h3>Evidence</h3>
+            <ul id="evidence" class="evidence"><li class="empty">Available when the run ends.</li></ul>
+          </section>
         </div>
-      </section>
+      </main>
+    </div>
 
-      <ol class="pipeline" id="pipeline" aria-label="Execution pipeline">
-        <li data-stage="propose"><span class="dot"></span><span id="stage-propose">Planner proposes</span></li>
-        <li data-stage="policy"><span class="dot"></span><span>Policy decides</span></li>
-        <li data-stage="execute"><span class="dot"></span><span>Browser executes</span></li>
-        <li data-stage="verify"><span class="dot"></span><span>Verifier decides</span></li>
-        <li data-stage="evidence"><span class="dot"></span><span>Evidence sealed</span></li>
-        <li data-stage="teardown"><span class="dot"></span><span>Sandbox destroyed</span></li>
-      </ol>
-
-      <section id="approval" class="approval" hidden aria-labelledby="approval-h">
-        <h3 id="approval-h">Operator approval required</h3>
-        <p>The agent wants to <strong id="approval-element">place the order</strong>. Approve only this exact cart. The signed approval is single-use, bound to this run and cart, and the store verifies it itself.</p>
-        <dl class="cart" id="approval-cart"></dl>
-        <p class="mono small">Cart hash <span id="approval-hash"></span></p>
-        <div class="row">
-          <button id="approve-btn" class="primary" type="button">Approve this order</button>
-          <button id="reject-btn" class="ghost" type="button">Reject</button>
-        </div>
-      </section>
-
-      <div class="grid">
-        <section class="panel timeline-panel" aria-labelledby="timeline-h">
-          <h3 id="timeline-h">Decision timeline</h3>
-          <ol id="timeline" class="timeline"><li class="empty">Steps appear here as the agent works.</li></ol>
-        </section>
-
-        <section class="panel browser-panel" aria-labelledby="browser-h">
-          <h3 id="browser-h">Browser view <span class="small muted" id="shot-label"></span></h3>
-          <figure class="shot">
-            <img id="shot" alt="Latest screenshot from the sandboxed browser" hidden>
-            <figcaption id="shot-empty" class="empty">Real screenshots from the worker appear here.</figcaption>
-          </figure>
-          <div id="thumbs" class="thumbs" aria-label="All screenshots"></div>
-        </section>
-
-        <section class="panel verify-panel" aria-labelledby="verify-h">
-          <h3 id="verify-h">Independent verification</h3>
-          <div id="verdict" class="verdict pending">Waiting for the run</div>
-          <ul id="outcomes" class="outcomes"></ul>
-          <table class="checks" id="checks" hidden>
-            <caption class="sr">Assertions, expected values frozen before the first model call</caption>
-            <thead><tr><th scope="col">Check</th><th scope="col">Expected</th><th scope="col">Observed</th><th scope="col">Result</th></tr></thead>
-            <tbody></tbody>
-          </table>
-        </section>
-
-        <section class="panel contain-panel" aria-labelledby="contain-h">
-          <h3 id="contain-h">Containment</h3>
-          <ul id="containment" class="containment"><li class="empty">Blocked requests and refused actions appear here.</li></ul>
-          <h3>Evidence</h3>
-          <ul id="evidence" class="evidence"><li class="empty">Available when the run ends.</li></ul>
-        </section>
+    <main class="view evidence-view" id="view-evidence" hidden>
+      <h2 id="evidence-heading" tabindex="-1">Evidence</h2>
+      <p class="lead">Finished runs, read from their sealed files. Older runs show only what they recorded.</p>
+      <div class="evidence-layout">
+        <aside aria-label="Finished runs">
+          <form id="compare-form" class="compare-form" hidden>
+            <label for="compare-a">Compare run A</label>
+            <select id="compare-a"></select>
+            <label for="compare-b">with run B</label>
+            <select id="compare-b"></select>
+            <button class="ghost" type="submit">Compare</button>
+          </form>
+          <ol id="run-list" class="run-list"><li class="empty">Loading runs…</li></ol>
+        </aside>
+        <div id="evidence-detail" class="evidence-detail"><p class="empty">Open a run to inspect it, or choose two to compare.</p></div>
       </div>
     </main>
+
+    <main class="view" id="view-trust" hidden>
+      <h2 id="trust-heading" tabindex="-1">Trust</h2>
+      <p class="lead">What this deployment enforces, read from the running system.</p>
+      <div id="trust-body" class="trust-body"><p class="empty">Loading…</p></div>
+    </main>
   </div>
+
   <footer class="foot">
-    <p>Synthetic store, synthetic data, no real payments. Every status on this page comes from the running system.</p>
+    <p>Synthetic store, synthetic data, no real payments. Every status on this page comes from the running system or a sealed record.</p>
   </footer>
 </body>
 </html>

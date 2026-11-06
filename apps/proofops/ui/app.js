@@ -1,4 +1,7 @@
 // JARVIS ProofOps operator UI. Every indicator is driven by data from the control plane; nothing is simulated.
+import { renderOutcome, renderOutcomeUnavailable } from "./verdict.js";
+import { loadEvidenceList, loadTrust, openCompare, openRun } from "./views.js";
+
 const $ = (id) => document.getElementById(id);
 const el = (tag, cls, text) => {
   const n = document.createElement(tag);
@@ -46,6 +49,7 @@ async function loadHealth() {
 // Radio-group pattern: one tab stop, arrow keys move the selection, focus is never lost on select.
 function selectScenario(s, focus = false) {
   selected = s;
+  $("selected-mission").textContent = s.title;
   for (const b of $("scenario-list").children) {
     const on = b.dataset.id === s.id;
     b.setAttribute("aria-checked", String(on));
@@ -110,6 +114,8 @@ function resetRunView(scenario, runId) {
   $("outcomes").replaceChildren();
   $("checks").hidden = true;
   $("approval").hidden = true;
+  $("outcome").hidden = true;
+  $("outcome").replaceChildren();
   for (const li of document.querySelectorAll("#pipeline li")) li.className = "";
 }
 
@@ -162,7 +168,7 @@ function addStep(s) {
   if (s.model?.provider) why.push(`${s.model.provider === "local-model-stub" ? "Scripted stub" : `Vultr ${s.model.responseModel ?? s.model.requestedModel}`}${s.model.latencyMs ? ` · ${s.model.latencyMs} ms` : ""}`);
   for (const w of why) li.append(el("div", "why", w));
   tl.append(li);
-  li.scrollIntoView({ block: "nearest", behavior: "smooth" });
+  tl.scrollTop = tl.scrollHeight;
   if (decision === "deny" || decision === "needs_approval") {
     addContainment(`Refused before dispatch: ${describe(s.proposal)}`, s.policy?.rule ?? "");
   }
@@ -236,6 +242,27 @@ function showApproval(p) {
   $("approve-btn").focus();
 }
 
+/** States the finished run's outcome where it can't be missed, using its sealed record. */
+async function showOutcome(runId, verdict, { reveal = true } = {}) {
+  const box = $("outcome");
+  let summary = null;
+  for (let attempt = 0; attempt < 3 && !summary; attempt++) {
+    try { summary = await api(`/api/runs/${runId}/summary`); }
+    catch (e) { if (e.status !== 409) break; await new Promise((r) => setTimeout(r, 300)); }
+  }
+  if (current?.runId !== runId) return; // another mission took over while this loaded
+  if (summary) renderOutcome(box, summary);
+  else renderOutcomeUnavailable(box, verdict);
+  const link = el("a", "outcome-link", "Open the full record");
+  link.href = `#evidence/${runId}`;
+  box.append(link);
+  if (reveal && !$("view-run").hidden) {
+    const calm = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    box.scrollIntoView({ block: "center", behavior: calm ? "auto" : "smooth" });
+    box.focus({ preventScroll: true });
+  }
+}
+
 function renderArchivedRun(snap) {
   const verdict = $("verdict");
   verdict.className = `verdict ${snap.verdict ?? "pending"}`;
@@ -246,6 +273,7 @@ function renderArchivedRun(snap) {
   $("containment").replaceChildren(el("li", "empty", "See the saved gateway and policy logs for containment details."));
   if (snap.manifestSha256) renderEvidence(snap.runId, snap.manifestSha256);
   else $("evidence").replaceChildren(el("li", "empty", "No anchored evidence is available."));
+  showOutcome(snap.runId, snap.verdict, { reveal: false });
 }
 
 function renderResult(snap) {
@@ -280,6 +308,7 @@ function renderResult(snap) {
   stage("verify", r.verdict === "PASS" ? "done" : "bad");
   for (const li of document.querySelectorAll("#pipeline li.active")) li.className = "done"; // nothing is still running once there is a result
   renderEvidence(snap.runId, r.manifestSha256);
+  showOutcome(snap.runId, r.verdict);
 }
 
 function renderEvidence(runId, manifestSha256) {
@@ -416,6 +445,36 @@ async function decide(kind) {
   }
 }
 
+const VIEWS = ["run", "evidence", "trust"];
+function showView(name) {
+  for (const v of VIEWS) $(`view-${v}`).hidden = v !== name;
+  for (const a of document.querySelectorAll(".nav a")) {
+    if (a.dataset.view === name) a.setAttribute("aria-current", "page");
+    else a.removeAttribute("aria-current");
+  }
+  document.title = name === "run" ? "JARVIS ProofOps" : `${name === "evidence" ? "Evidence" : "Trust"} · JARVIS ProofOps`;
+}
+async function route() {
+  const [head, a, b] = location.hash.replace(/^#/, "").split("/");
+  if (head === "" || head === "run") { showView("run"); return; }
+  if (head === "trust") { showView("trust"); await loadTrust(); return; }
+  if (head === "evidence" || head === "compare") {
+    showView("evidence");
+    await loadEvidenceList();
+    if (head === "compare" && a && b) {
+      $("compare-a").value = a;
+      $("compare-b").value = b;
+      await openCompare(a, b);
+    } else if (a) await openRun(a);
+  }
+}
+window.addEventListener("hashchange", route);
+$("compare-form").addEventListener("submit", (e) => {
+  e.preventDefault();
+  location.hash = `#compare/${$("compare-a").value}/${$("compare-b").value}`;
+});
+$("compare-b").addEventListener("change", () => { $("compare-b").dataset.touched = "1"; });
+
 $("run-btn").addEventListener("click", startRun);
 $("approve-btn").addEventListener("click", () => decide("approve"));
 $("reject-btn").addEventListener("click", () => decide("reject"));
@@ -428,6 +487,7 @@ $("cancel-btn").addEventListener("click", async () => { if (current) await api(`
   renderScenarios();
   $("run-btn").disabled = !selected;
   loadHistory();
+  route();
   // A reload mid-mission reconnects to the same run; it never starts or repeats anything.
   try {
     const saved = JSON.parse(sessionStorage.getItem("proofops.run") ?? "null");

@@ -95,12 +95,15 @@ async function listen(server: Server, where: { port: number; host: string } | { 
   });
 }
 
+/** Per-run budgets when a caller sets none. Exported so the UI can show the real numbers. */
+export const RUN_LIMITS = { maxSteps: 12, maxModelCalls: 14, maxTotalTokens: 60_000 } as const;
+
 export async function runScenario(cfg: RunConfig): Promise<RunResult> {
   const runId = cfg.runId ?? newRunId();
-  const maxSteps = cfg.maxSteps ?? 12;
+  const maxSteps = cfg.maxSteps ?? RUN_LIMITS.maxSteps;
   const deadline = Date.now() + (cfg.wallClockMs ?? 120_000);
-  const maxModelCalls = cfg.maxModelCalls ?? 14;
-  const maxTotalTokens = cfg.maxTotalTokens ?? 60_000;
+  const maxModelCalls = cfg.maxModelCalls ?? RUN_LIMITS.maxModelCalls;
+  const maxTotalTokens = cfg.maxTotalTokens ?? RUN_LIMITS.maxTotalTokens;
   const dir = join(cfg.evidenceRoot, runId);
   // A run id is used once: never overwrite an earlier run's evidence.
   try {
