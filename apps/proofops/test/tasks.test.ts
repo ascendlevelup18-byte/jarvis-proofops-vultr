@@ -44,6 +44,19 @@ test("a total the person states is what's checked, even when it disagrees with t
   assert.equal(freezeSpec(t.mode, t.plannerTask, 0, t.goal).expected.totalCents, 8_000);
 });
 
+test("a stated total has to be a sensible amount", () => {
+  for (const t of [`Add a jacket and check the total is $${"9".repeat(400)}`, "Add a jacket and check the total is $99999999999999999", "Add a jacket and check the total is $1,000,001"]) no(t, "clarify");
+  assert.equal(ok("Add a jacket and check the total is $1,000,000").goal.expectedTotalCents, 100_000_000);
+  assert.equal(ok("Add a jacket and check the total is $0").goal.expectedTotalCents, 0);
+  assert.equal(ok("Add a jacket and check the total is $89.99").goal.expectedTotalCents, 8_999);
+});
+
+test("the frozen goal is covered by the spec's hash", () => {
+  const t = ok("Add 2 jackets with SAVE10.");
+  const spec = freezeSpec(t.mode, t.plannerTask, 0, t.goal);
+  assert.equal(specIntact({ ...spec, goal: { ...t.goal, quantity: 5 } }), false);
+});
+
 test("a code the store doesn't have is kept, and no discount is expected", () => {
   const t = ok("Add one jacket and apply code SAVE50.");
   assert.equal(t.goal.coupon, "SAVE50");

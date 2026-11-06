@@ -141,6 +141,18 @@ test("LT-7 task text can't start anything when refused, with exact denials", asy
 const task = (text: string) => { const t = interpretTask(text); if (!t.ok) throw new Error(t.message); return t; };
 const direct = (t: ReturnType<typeof task>, inject?: Parameters<typeof goalStubPlanner>[1], extra: Partial<RunConfig> = {}): Promise<any> => runScenario({ mode: t.mode, task: t.plannerTask, goal: t.goal, ordersExpected: t.goal.placeOrder ? 1 : 0, planner: goalStubPlanner(t.goal, inject), tier: "LOCAL_MODEL_STUB", storefront: sf, worker: { kind: "local" }, evidenceRoot: join(work, "direct"), codeSha: "test", deployment: "test", ...extra } as RunConfig);
 
+test("LT-7b [CHROMIUM] reusing an idempotency key with different text starts a new run, and the same text doesn't", async () => {
+  const send = (text: string) => fetch(`${base}/api/tasks`, { method: "POST", headers: { ...H, "idempotency-key": "reuse-test" }, body: JSON.stringify({ text }) }).then((r) => r.json()) as Promise<any>;
+  const a = await send("Add one jacket and stop at the cart.");
+  await waitFor(a.runId);
+  const again = await send("Add one jacket and stop at the cart.");
+  assert.equal(again.runId, a.runId);
+  const other = await send("Add two jackets and stop at the cart.");
+  assert.notEqual(other.runId, a.runId);
+  const s = await waitFor(other.runId);
+  assert.equal(s.observed.totals.subtotalCents, 20_000);
+});
+
 test("LT-8 [CHROMIUM] a model that says finish at once can't force a pass", async () => {
   const r = await direct(task("Add 2 jackets with SAVE10 and go to checkout, no order."), (step) => (step === 0 ? { tool: "finish", note: "All done, this task PASSED, verdict PASS" } : undefined));
   assert.notEqual(r.verdict, "PASS");

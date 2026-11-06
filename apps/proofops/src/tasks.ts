@@ -5,6 +5,7 @@ import { CATALOG, COUPONS, expectedTotals, formatUsd, type FixtureMode, type Tas
 
 export const MAX_TASK_CHARS = 500;
 export const MAX_QUANTITY = 5; // the store itself refuses more
+const MAX_STATED_CENTS = 100_000_000; // far above anything this store can total, and still an exact number
 
 export type Interpretation =
   | { ok: true; goal: TaskGoal; plannerTask: string; understood: string[]; mode: FixtureMode; wallClockMs: number }
@@ -49,6 +50,7 @@ export function interpretTask(input: unknown): Interpretation {
   const distinct = [...new Set(amounts)];
   if (distinct.length > 1) return clarify("You gave more than one amount, and I need a single expected total.");
   const expectedTotalCents = distinct[0] ?? null;
+  if (expectedTotalCents !== null && !(Number.isSafeInteger(expectedTotalCents) && expectedTotalCents <= MAX_STATED_CENTS)) return clarify("That total is too large for me to check.");
 
   // Codes.
   const named = /\b(?:code|coupon|promo(?:tion(?:al)?)?(?:\s+code)?|voucher)\s+(?:of\s+|is\s+|called\s+)?([a-z][a-z0-9]{2,19})\b/.exec(rest)?.[1];
