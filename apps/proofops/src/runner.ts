@@ -7,7 +7,7 @@ import { createHash, randomBytes } from "node:crypto";
 import { join } from "node:path";
 import type { AddressInfo } from "node:net";
 import type { Server } from "node:http";
-import { freezeSpec, type FixtureMode, type FrozenSpec } from "./fixtures.ts";
+import { freezeSpec, type FixtureMode, type FrozenSpec, type TaskGoal } from "./fixtures.ts";
 import { createGateway, type GatewayEvent } from "./gateway.ts";
 import { checkAction, type Observation, type PolicyDecision, type RunScope } from "./policy.ts";
 import { launchWorker, type SandboxLimits, type WorkerHandle } from "./worker-client.ts";
@@ -32,6 +32,8 @@ export interface RunConfig {
   runId?: string;
   task?: string;
   ordersExpected?: number;
+  /** A validated Live Task. The planner only ever sees cfg.task, generated from this. */
+  goal?: TaskGoal;
   /** Operator approval for consequential steps. Returns a signed one-time token, or null when refused or timed out. */
   approval?: (req: ApprovalRequest) => Promise<string | null>;
   /** Test hook: receives the worker handle right after launch. */
@@ -130,17 +132,17 @@ export async function runScenario(cfg: RunConfig): Promise<RunResult> {
   };
 
   // 1. Freeze the assertions before anything else happens.
-  const spec: FrozenSpec = freezeSpec(cfg.mode, cfg.task, cfg.ordersExpected ?? 0);
+  const spec: FrozenSpec = freezeSpec(cfg.mode, cfg.task, cfg.ordersExpected ?? 0, cfg.goal);
   await put("spec.json", JSON.stringify(spec, null, 2));
   ev("spec.frozen", { specSha256: spec.specSha256 });
 
   // 2. A fresh storefront session for this run.
-  const sres = await fetch(`${cfg.storefront.trustedBase}/sessions`, { method: "POST", body: JSON.stringify({ runId, mode: cfg.mode }) });
+  const sres = await fetch(`${cfg.storefront.trustedBase}/sessions`, { method: "POST", body: JSON.stringify({ runId, mode: cfg.mode, quantityField: cfg.goal !== undefined }) });
   const { sid, basePath } = (await sres.json()) as { sid: string; basePath: string };
   const scope: RunScope = {
     base: `http://${STORE_HOST}${basePath}`,
     navigablePaths: ["/", "/cart", "/checkout"],
-    fillableInputs: ["code"],
+    fillableInputs: cfg.goal && cfg.goal.quantity > 1 ? ["code", "quantity"] : ["code"],
     consequentialPaths: ["/checkout/submit"],
     maxSteps,
   };

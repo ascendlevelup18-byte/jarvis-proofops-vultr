@@ -15,7 +15,7 @@ export interface Scenario {
   /** Harness-forced malicious proposals (LOCAL MODEL STUB only); never presented as model behaviour. */
   forcedMalicious: boolean;
   /** What this mission is designed to end with. Used only to label a finished run; the verifier decides the verdict. */
-  expected: { status: "completed" | "timed_out"; verdict: "PASS" | "FAIL"; failing?: string[] };
+  expected: { status: "completed" | "timed_out"; verdict: "PASS" | "FAIL" | "OPEN"; failing?: string[] };
 }
 
 export const APPROVAL_TASK =

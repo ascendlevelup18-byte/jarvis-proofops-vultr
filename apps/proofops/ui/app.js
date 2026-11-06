@@ -133,6 +133,7 @@ function stage(name, state) {
 }
 
 function setStatus(status) {
+  $("task-run").disabled = status === "running" || status === "awaiting_approval";
   const s = $("run-status");
   s.className = `status ${status}`;
   s.textContent = { running: "Running", awaiting_approval: "Awaiting approval", completed: "Completed", failed: "Failed", timed_out: "Timed out", cancelled: "Cancelled" }[status] ?? status;
@@ -161,10 +162,14 @@ function addStep(s) {
   const label = { allow: "ALLOWED", deny: "REFUSED", needs_approval: "NEEDS APPROVAL", approved: "OPERATOR APPROVED" }[decision] ?? decision;
   top.append(el("span", `badge ${decision}`, label));
   li.append(top);
+  if (current?.live) {
+    li.prepend(el("div", "tag", "ACTION"));
+    li.append(el("div", "why", `POLICY: ${label.toLowerCase()} (${(s.policy?.rule ?? "no rule recorded").replaceAll("_", " ")})`));
+  }
   const why = [];
   if (s.proposal?.reason) why.push(`Model's reason: "${s.proposal.reason}"`);
   if (s.policy?.decision !== "allow" && s.policy?.rule) why.push(`Policy: ${s.policy.rule.replaceAll("_", " ")}${s.policy.detail ? ` (${s.policy.detail})` : ""}`);
-  if (s.result) why.push(s.dispatched ? `Result: ${s.result}` : "Not dispatched to the browser");
+  if (s.result) why.push(s.dispatched ? `${current?.live ? "OBSERVATION" : "Result"}: ${s.result}` : "Not dispatched to the browser");
   if (s.model?.provider) why.push(`${s.model.provider === "local-model-stub" ? "Scripted stub" : `Vultr ${s.model.responseModel ?? s.model.requestedModel}`}${s.model.latencyMs ? ` · ${s.model.latencyMs} ms` : ""}`);
   for (const w of why) li.append(el("div", "why", w));
   tl.append(li);
@@ -172,6 +177,12 @@ function addStep(s) {
   if (decision === "deny" || decision === "needs_approval") {
     addContainment(`Refused before dispatch: ${describe(s.proposal)}`, s.policy?.rule ?? "");
   }
+}
+
+function addNote(tag, text) {
+  const li = el("li", "step note");
+  li.append(el("div", "tag", tag), el("div", "why", text));
+  $("timeline").append(li);
 }
 
 function addContainment(text, detail, kind = "policy") {
@@ -222,7 +233,7 @@ function onEvent(e) {
     case "approval.replay_probe":
       addContainment(`Replay of the used approval sent straight to the store: HTTP ${e.status}`, e.refused ? "Store refused the replay" : "Store did NOT refuse the replay", "policy");
       break;
-    case "verifier.dom_read": stage("verify", "active"); break;
+    case "verifier.dom_read": stage("verify", "active"); if (current?.live) addNote("VERIFIER", "Reading the page and the store's own records, and checking them against the frozen goal."); break;
     case "run.wall_clock_expired": addContainment("Wall-clock limit reached: worker destroyed", "Hard stop", "limit"); break;
     case "cleanup.done": stage("evidence", "done"); stage("teardown", e.workerGone ? "done" : "bad"); break;
   }
@@ -253,6 +264,7 @@ async function showOutcome(runId, verdict, { reveal = true } = {}) {
   if (current?.runId !== runId) return; // another mission took over while this loaded
   if (summary) renderOutcome(box, summary);
   else renderOutcomeUnavailable(box, verdict);
+  if (current?.live) addNote("RESULT", box.querySelector(".outcome-label")?.textContent ?? "No result recorded");
   const link = el("a", "outcome-link", "Open the full record");
   link.href = `#evidence/${runId}`;
   box.append(link);
@@ -281,7 +293,7 @@ function renderResult(snap) {
   if (!r) return;
   const v = $("verdict");
   v.className = `verdict ${r.verdict}`;
-  v.textContent = r.verdict === "PASS" ? "VERIFIED PASS" : r.verdict === "FAIL" ? "VERIFIED FAIL" : "INCONCLUSIVE";
+  v.textContent = snap.status !== "completed" ? "NOT VERIFIED" : r.verdict === "PASS" ? "VERIFIED PASS" : r.verdict === "FAIL" ? "VERIFIED FAIL" : "INCONCLUSIVE";
   const blocked = $("containment").querySelectorAll("li:not(.empty):not(.limit)").length;
   if (!$("containment").querySelector("li:not(.empty)")) $("containment").replaceChildren(el("li", "empty", "Nothing was blocked in this run."));
   if (!$("timeline").children.length) $("timeline").append(el("li", "empty", "No step finished before the run ended."));
@@ -352,7 +364,7 @@ async function startRun() {
   $("run-btn").disabled = true;
   try {
     const { runId, runToken } = await api("/api/runs", { method: "POST", body: JSON.stringify({ scenario: scenario.id }), headers: { "idempotency-key": crypto.randomUUID() } });
-    current = { runId, running: true, runToken };
+    current = { runId, running: true, runToken, live: false };
     try { sessionStorage.setItem("proofops.run", JSON.stringify({ runId, runToken, scenarioId: scenario.id })); } catch { /* optional */ }
     resetRunView(scenario, runId);
     setStatus("running");
@@ -370,6 +382,51 @@ async function startRun() {
     $("run-btn").disabled = !selected || Boolean(current?.running);
   }
 }
+
+// ---------- Live Tasks ----------
+const LIVE_TASK = (text) => ({ id: "live-task", title: "Live task", purpose: text });
+function showUnderstood(understood, userText) {
+  const li = el("li", "step goal");
+  li.append(el("div", "goal-title", "JARVIS: I understand your task."), el("div", "why", `You asked: "${userText}"`));
+  const ul = el("ul", "goal-list");
+  for (const line of understood) ul.append(el("li", "", line));
+  li.append(ul, el("div", "why", "This goal is frozen before the model starts. The model gets only this goal, not your original text."));
+  $("timeline").prepend(li);
+}
+async function runTask(e) {
+  e.preventDefault();
+  const text = $("task-text").value.trim();
+  const reply = $("task-reply");
+  reply.hidden = true;
+  if (starting || current?.running) return;
+  starting = true;
+  $("task-run").disabled = true;
+  try {
+    const r = await api("/api/tasks", { method: "POST", body: JSON.stringify({ text }), headers: { "idempotency-key": crypto.randomUUID() } });
+    current = { runId: r.runId, running: true, runToken: r.runToken, live: true };
+    try { sessionStorage.setItem("proofops.run", JSON.stringify({ runId: r.runId, runToken: r.runToken, scenarioId: "live-task", plannerTask: r.plannerTask, understood: r.understood, userText: r.userText })); } catch { /* optional */ }
+    resetRunView(LIVE_TASK(r.plannerTask), r.runId);
+    showUnderstood(r.understood, r.userText);
+    setStatus("running");
+    $("run-title").scrollIntoView({ block: "start" });
+    follow(r.runId);
+  } catch (err) {
+    reply.className = "task-reply";
+    reply.textContent = err.body?.message ?? (err.status === 409 ? "Another task is still running. Wait for it to finish."
+      : err.message === "daily_limit" ? "This demo has reached its daily limit. Please try again tomorrow."
+      : err.status === 429 ? "Too many requests in the last minute. Try again shortly."
+      : "The task couldn't be started.");
+    reply.hidden = false;
+    reply.focus?.();
+  } finally {
+    starting = false;
+    $("task-run").disabled = Boolean(current?.running);
+  }
+}
+$("task-form").addEventListener("submit", runTask);
+$("task-text").addEventListener("keydown", (e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); $("task-form").requestSubmit(); } });
+for (const b of document.querySelectorAll(".example")) b.addEventListener("click", () => { $("task-text").value = b.dataset.task; $("task-text").focus(); });
+if (window.matchMedia("(max-width: 760px)").matches) $("missions-box").open = false;
 
 function follow(runId) {
   const es = new EventSource(`/api/runs/${runId}/stream`);
@@ -396,6 +453,7 @@ function follow(runId) {
     showApproval(null);
     renderResult(s);
     $("run-btn").disabled = !selected;
+    $("task-run").disabled = false;
     loadHistory();
     loadHealth();
   });
@@ -493,17 +551,20 @@ $("cancel-btn").addEventListener("click", async () => { if (current) await api(`
     const saved = JSON.parse(sessionStorage.getItem("proofops.run") ?? "null");
     if (saved?.runId) {
       const snap = await api(`/api/runs/${saved.runId}`);
-      const scenario = scenarios.find((s) => s.id === saved.scenarioId);
+      const live = saved.scenarioId === "live-task";
+      const scenario = live ? LIVE_TASK(saved.plannerTask) : scenarios.find((s) => s.id === saved.scenarioId);
       if (!snap.events && scenario) {
-        selectScenario(scenario);
-        current = { runId: saved.runId, running: false };
+        if (!live) selectScenario(scenario);
+        current = { runId: saved.runId, running: false, live };
         resetRunView(scenario, saved.runId);
+        if (live) showUnderstood(saved.understood, saved.userText);
         setStatus(snap.status);
         renderArchivedRun(snap);
       } else if (snap.events && scenario) {
-        selectScenario(scenario);
-        current = { runId: saved.runId, running: !snap.result, runToken: saved.runToken };
+        if (!live) selectScenario(scenario);
+        current = { runId: saved.runId, running: !snap.result, runToken: saved.runToken, live };
         resetRunView(scenario, saved.runId);
+        if (live) showUnderstood(saved.understood, saved.userText);
         setStatus(snap.status);
         follow(saved.runId);
         $("run-btn").disabled = current.running;

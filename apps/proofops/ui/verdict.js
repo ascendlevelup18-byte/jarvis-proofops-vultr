@@ -10,12 +10,24 @@ export const usd = (cents) => (typeof cents === "number" ? `${cents < 0 ? "-" : 
 export const OUTCOME = {
   verified_success: { label: "Verified success", tone: "good", sub: "Independent checks of the page and the store's records passed." },
   designed_negative: { label: "Designed negative test: failed as intended", tone: "designed", sub: "This mission exists to fail. The safety checks held, and this isn't a system fault." },
+  verified_fail: { label: "Verified fail: the result didn't match", tone: "bad", sub: "The task ran within its limits, and the store's own records didn't match what was expected." },
   unexpected_failure: { label: "Unexpected execution failure", tone: "bad", sub: "The run didn't end the way this mission is designed to." },
   unexpected_result: { label: "Unexpected result", tone: "bad", sub: "This mission is designed to fail, but it passed. The check may have missed something." },
   timed_out: { label: "Timed out", tone: "warn", sub: "The run hit its time limit, and this mission isn't designed to." },
   cancelled: { label: "Cancelled", tone: "warn", sub: "The operator stopped this run, so it has no complete result." },
   incomplete_evidence: { label: "Incomplete evidence", tone: "warn", sub: "The record is missing something, so this run can't be called verified." },
   evidence_integrity_failure: { label: "Evidence integrity failure", tone: "bad", sub: "The files no longer match their recorded checksums. Don't rely on this run's result." },
+};
+
+/** A person's own task has no designed result, so it reports in these terms. */
+const TASK_OUTCOME = {
+  verified_success: { label: "VERIFIED PASS", tone: "good", sub: "The task ran, and independent checks of the page and the store's records matched your goal." },
+  verified_fail: { label: "VERIFIED FAIL", tone: "bad", sub: "The task ran within its limits, and the store's own records didn't match your goal." },
+  task_declined: { label: "INCOMPLETE: you declined the order", tone: "warn", sub: "You declined, so no order was placed and the goal wasn't met." },
+  unexpected_failure: { label: "EXECUTION ERROR", tone: "bad", sub: "The run didn't complete cleanly, so it proves nothing about your goal." },
+  timed_out: { label: "INCOMPLETE: timed out", tone: "warn", sub: "The run hit its time limit before it could finish, so it isn't a pass." },
+  cancelled: { label: "INCOMPLETE: cancelled", tone: "warn", sub: "The run was stopped before it could finish, so it isn't a pass." },
+  incomplete_evidence: { label: "INCOMPLETE", tone: "warn", sub: "The record is missing something, so this run can't be called verified." },
 };
 
 /** Who proposed the actions, from what the run recorded. Never inferred from the current deployment. */
@@ -43,7 +55,8 @@ function headline(s) {
 }
 
 export function renderOutcome(node, s) {
-  const o = OUTCOME[s.outcomeClass] ?? OUTCOME.incomplete_evidence;
+  const isTask = s.mission?.id === "live-task";
+  const o = (isTask && TASK_OUTCOME[s.outcomeClass]) || OUTCOME[s.outcomeClass] || OUTCOME.incomplete_evidence;
   node.hidden = false;
   node.className = `outcome ${o.tone}`;
   node.dataset.outcome = s.outcomeClass;
@@ -58,7 +71,7 @@ export function renderOutcome(node, s) {
   const meta = el("ul", "outcome-meta");
   meta.setAttribute("aria-label", "Recorded facts");
   meta.append(
-    el("li", "", `Mission outcome: ${s.missionOutcome ?? s.verdict ?? "none"}`),
+    el("li", "", `${isTask ? "Task" : "Mission"} outcome: ${s.missionOutcome ?? s.verdict ?? "none"}`),
     el("li", s.evidence?.status === "TAMPERED" ? "bad" : "", `Evidence integrity: ${s.evidence?.integrity_status ?? s.evidence?.status ?? "unknown"}${s.evidence && !s.evidence.anchored ? ", no recorded anchor" : ""}`),
     el("li", "", plannerLabel(s.model?.provider, s.model?.requested)),
     el("li", "", tierLabel(s.tier)),

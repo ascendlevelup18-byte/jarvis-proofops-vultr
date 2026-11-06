@@ -3,6 +3,7 @@
 // "stub" is a scripted planner for the LOCAL MODEL STUB tier; every record it makes says so.
 import { OpenAICompatibleClient, cleanupModelContent, redactSecrets } from "../../api/src/provider/index.ts";
 import type { Observation } from "./policy.ts";
+import type { TaskGoal } from "./fixtures.ts";
 
 export const VULTR_INFERENCE_BASE_URL = "https://api.vultrinference.com/v1";
 
@@ -113,6 +114,51 @@ export function vultrPlanner(opts: { apiKey: string; model: string; timeoutMs?: 
           latencyMs: Math.round(performance.now() - started), rawContent: "", parsed: null, error: scrub(String((e as Error).message)).slice(0, 300),
         };
       }
+    },
+  };
+}
+
+/** LOCAL MODEL STUB for Live Tasks: a scripted walk through a validated goal. It's never presented as AI. */
+export function goalStubPlanner(goal: TaskGoal, inject?: (step: number, o: Observation) => unknown): Planner {
+  let step = 0;
+  let quantityTyped = false;
+  let codeTyped = false;
+  let codeApplied = false;
+  let approvalAsked = false;
+  return {
+    kind: "stub",
+    model: "local-model-stub",
+    async next(turn) {
+      const o = turn.observation;
+      const forced = inject?.(step, o);
+      step += 1;
+      const by = (pred: (e: Observation["elements"][number]) => boolean) => o.elements.find(pred);
+      const path = new URL(o.url).pathname;
+      let action: unknown;
+      if (forced !== undefined) action = forced;
+      else if (/\/checkout\/submit$/.test(path)) action = { tool: "finish", note: "order step done" };
+      else if (/\/checkout$/.test(path)) {
+        const order = by((e) => e.consequential === true);
+        if (goal.placeOrder && order && !approvalAsked) { approvalAsked = true; action = { tool: "request_approval", ref: order.ref, epoch: o.epoch, reason: "placing the order needs the operator" }; }
+        else action = { tool: "finish", note: goal.placeOrder ? "the order wasn't approved" : "checkout reached" };
+      } else if (/\/cart$/.test(path)) {
+        const code = by((e) => e.name === "code");
+        const apply = by((e) => e.text === "Apply code");
+        const go = by((e) => e.text === "Proceed to checkout");
+        if (goal.coupon && !codeTyped && code) { codeTyped = true; action = { tool: "fill", ref: code.ref, epoch: o.epoch, value: goal.coupon }; }
+        else if (goal.coupon && !codeApplied && apply) { codeApplied = true; action = { tool: "click", ref: apply.ref, epoch: o.epoch }; }
+        else if (goal.reachCheckout && go) action = { tool: "click", ref: go.ref, epoch: o.epoch };
+        else action = { tool: "finish", note: "cart step done" };
+      } else {
+        const qty = by((e) => e.name === "quantity");
+        const add = by((e) => e.text === "Add to cart");
+        if (goal.quantity > 1 && qty && !quantityTyped) { quantityTyped = true; action = { tool: "fill", ref: qty.ref, epoch: o.epoch, value: String(goal.quantity) }; }
+        else action = add ? { tool: "click", ref: add.ref, epoch: o.epoch } : { tool: "finish", note: "no add button" };
+      }
+      return {
+        provider: "local-model-stub", requestedModel: "local-model-stub", responseModel: "local-model-stub", responseId: null, usage: null,
+        latencyMs: 0, rawContent: JSON.stringify(action), parsed: action, error: null,
+      };
     },
   };
 }

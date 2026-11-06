@@ -296,3 +296,29 @@ button:disabled { cursor: not-allowed; opacity: 0.5; }
 .run-head .mono, .chip, .approval .mono { overflow-wrap: anywhere; }
 .chip { white-space: normal; }
 @media (prefers-reduced-motion: reduce) { * { scroll-behavior: auto !important; } }
+
+/* Live Tasks */
+.composer { padding: 18px 28px; border-bottom: 1px solid var(--line); background: linear-gradient(180deg, rgba(56, 189, 248, 0.07), transparent); }
+.composer h2 { font-size: 22px; margin-bottom: 8px; letter-spacing: -0.01em; }
+.composer label { display: block; font-size: 13px; color: var(--ink-2); margin-bottom: 6px; }
+.composer textarea { width: 100%; font: inherit; font-size: 16px; color: var(--ink); background: var(--panel); border: 1px solid var(--line-2); border-radius: 10px; padding: 10px 12px; resize: vertical; }
+.composer-actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 10px; align-items: center; }
+.composer-actions .primary { width: auto; min-width: 140px; }
+.examples { display: flex; flex-wrap: wrap; gap: 6px; }
+.example { border: 1px solid var(--line-2); background: var(--panel); color: var(--ink-2); border-radius: 999px; padding: 6px 12px; font-size: 13px; }
+.example:hover { border-color: var(--accent); color: var(--ink); }
+.task-reply { margin-top: 10px; padding: 10px 12px; border: 1px solid rgba(251, 191, 36, 0.5); background: var(--warn-bg); border-radius: 10px; color: var(--ink); font-size: 14px; }
+.goal { border-color: rgba(56, 189, 248, 0.45); }
+.goal-title { font-weight: 700; font-size: 14px; color: var(--accent); }
+.goal-list { margin: 6px 0; padding-left: 18px; font-size: 13px; color: var(--ink); }
+.missions summary { cursor: pointer; list-style: none; margin-bottom: 10px; }
+.missions summary::-webkit-details-marker { display: none; }
+.missions summary h2 { display: inline; }
+.missions summary::after { content: " ▾"; color: var(--ink-2); }
+.missions details:not([open]) summary::after { content: " ▸"; }
+@media (max-width: 760px) {
+  .composer { padding: 12px 16px; }
+  .composer h2 { font-size: 18px; }
+  .composer-actions .primary { width: 100%; }
+}
+.tag { font-size: 11px; font-weight: 700; letter-spacing: 0.08em; color: var(--ink-2); margin-bottom: 2px; }

@@ -11,7 +11,9 @@ import { createHash, randomBytes, timingSafeEqual } from "node:crypto";
 import type { AddressInfo } from "node:net";
 import { createStorefront } from "./storefront.ts";
 import { startSigner } from "./signer.ts";
-import { stubPlanner, vultrPlanner, type Planner } from "./model.ts";
+import { goalStubPlanner, stubPlanner, vultrPlanner, type Planner } from "./model.ts";
+import { interpretTask } from "./tasks.ts";
+import type { TaskGoal } from "./fixtures.ts";
 import { runScenario, RUN_LIMITS, type ApprovalRequest, type RunConfig, type Tier } from "./runner.ts";
 import { SCENARIOS, findScenario, type Scenario } from "./scenarios.ts";
 import { RunStore } from "./store.ts";
@@ -102,7 +104,8 @@ if (SANDBOX) {
     execFileSync("docker", ["image", "inspect", IMAGE], { stdio: "ignore" });
   } catch (e) { die(`sandbox prerequisites missing: ${(e as Error).message.split("\n")[0]}`); }
 }
-const makePlanner = (): Planner => (PLANNER === "vultr" ? vultrPlanner({ apiKey: inferenceKey, model: MODEL! }) : stubPlanner());
+// A task goal changes which scripted walk the stub takes. It never changes which provider runs, and there's no fallback.
+const makePlanner = (goal?: TaskGoal): Planner => (PLANNER === "vultr" ? vultrPlanner({ apiKey: inferenceKey, model: MODEL! }) : goal ? goalStubPlanner(goal) : stubPlanner());
 const TIER: Tier = SANDBOX ? (PLANNER === "vultr" ? "VULTR_GVISOR_LIVE_MODEL" : "VULTR_GVISOR_SCRIPTED") : PLANNER === "vultr" ? "LOCAL_LIVE_MODEL" : "LOCAL_MODEL_STUB";
 
 // ---- Live run state (one mission at a time keeps the demo VM predictable) ----
@@ -135,7 +138,7 @@ function snapshot(l: Live) {
   };
 }
 
-async function startRun(scenario: Scenario, idempotencyKey: string | null): Promise<{ runId: string; created: boolean; runToken?: string }> {
+async function startRun(scenario: Scenario, idempotencyKey: string | null, goal?: TaskGoal): Promise<{ runId: string; created: boolean; runToken?: string }> {
   const runId = `run_${new Date().toISOString().replace(/[-:.TZ]/g, "").slice(0, 14)}_${randomBytes(8).toString("hex")}`;
   const reg = registry.create({ id: runId, idempotencyKey, mode: scenario.mode, tier: TIER });
   if (!reg.created) return { runId: reg.run.id, created: false };
@@ -144,7 +147,7 @@ async function startRun(scenario: Scenario, idempotencyKey: string | null): Prom
   active = live;
   const cfg: RunConfig = {
     runId, mode: scenario.mode, task: scenario.task, ordersExpected: scenario.ordersExpected,
-    planner: makePlanner(), tier: TIER, storefront,
+    planner: makePlanner(goal), tier: TIER, storefront, goal,
     worker: SANDBOX
       ? { kind: "sandbox", socketRoot: "/run/proofops", limits: { image: IMAGE, runtime: "runsc", memoryMb: 1024, cpus: 1, pids: 256, chromiumNoSandbox: NO_CHROMIUM_SANDBOX } }
       : { kind: "local" },
@@ -319,6 +322,21 @@ const server = createServer(async (req, res) => {
       if (registry.countSince(new Date(Date.now() - 86_400_000).toISOString()) >= MAX_RUNS_PER_DAY) return json(res, 429, { error: "daily_limit" });
       const key = typeof req.headers["idempotency-key"] === "string" ? req.headers["idempotency-key"].slice(0, 128) : null;
       return json(res, 202, await startRun(scenario, key));
+    }
+    // Live Tasks: validate the person's text into a goal, then use the same run path as every mission.
+    if (req.method === "POST" && p === "/api/tasks") {
+      if (!sameOrigin(req)) return json(res, 403, { error: "missing_ui_header" });
+      if (rateLimited(req)) return json(res, 429, { error: "rate_limited" });
+      const body = await readJson(req);
+      const task = interpretTask(body.text);
+      if (!task.ok) return json(res, 422, { error: task.kind === "clarify" ? "needs_clarification" : "unsupported_task", message: task.message });
+      if (active) return json(res, 409, { error: "busy" });
+      if (registry.countSince(new Date(Date.now() - 86_400_000).toISOString()) >= MAX_RUNS_PER_DAY) return json(res, 429, { error: "daily_limit" });
+      const key = typeof req.headers["idempotency-key"] === "string" ? req.headers["idempotency-key"].slice(0, 128) : null;
+      const scenario: Scenario = { id: "live-task", title: "Live task", purpose: task.plannerTask, mode: task.mode, task: task.plannerTask, ordersExpected: task.goal.placeOrder ? 1 : 0,
+        approvals: task.goal.placeOrder ? "operator" : "none", wallClockMs: task.wallClockMs, forcedMalicious: false, expected: { status: "completed", verdict: "OPEN" } };
+      const started = await startRun(scenario, key, task.goal);
+      return json(res, 202, { ...started, understood: task.understood, plannerTask: task.plannerTask, userText: task.goal.userText });
     }
     const m = /^\/api\/runs\/(run_[0-9]{14}_[0-9a-f]{8,16})(\/.*)?$/.exec(p);
     if (m) {

@@ -69,12 +69,17 @@ const inViewport = (page: Page, selector: string) => page.locator(selector).eval
   return r.top >= 0 && r.bottom <= window.innerHeight && r.width > 0;
 });
 const noOverflow = (page: Page) => page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth);
-const pick = (page: Page, title: string) => page.locator(".scenario", { hasText: title }).click();
+// The guided missions sit below the task box and start collapsed on a phone.
+const openMissions = async (page: Page) => { if (!(await page.locator("#missions-box").evaluate((d: HTMLDetailsElement) => d.open))) await page.locator("#missions-box summary").click(); };
+const pick = async (page: Page, title: string) => { await openMissions(page); await page.locator(".scenario", { hasText: title }).click(); };
 const finished = (page: Page) => page.waitForSelector("#outcome:not([hidden]) .outcome-link", { timeout: 60_000 });
 
 for (const [w, h] of [[375, 667], [375, 812], [768, 1024], [1280, 720], [1366, 768], [1440, 900]] as const) {
-  test(`MC-1 [CHROMIUM] Run mission is above the fold at ${w}x${h}, with no sideways scrolling`, async () => {
+  test(`MC-1 [CHROMIUM] Run task is above the fold and Run mission is reachable at ${w}x${h}, with no sideways scrolling`, async () => {
     const { ctx, page, errors } = await open(w, h);
+    assert.equal(await inViewport(page, "#task-run"), true);
+    await openMissions(page);
+    await page.locator("#run-btn").scrollIntoViewIfNeeded();
     assert.equal(await inViewport(page, "#run-btn"), true);
     assert.equal(await noOverflow(page), true);
     assert.deepEqual(errors, []);
@@ -208,14 +213,20 @@ test("MC-10 [CHROMIUM] Trust shows the real five actions and this deployment's r
   await ctx.close();
 });
 
-test("MC-11 [CHROMIUM] keyboard users reach navigation, missions and Run, with visible focus", async () => {
+test("MC-11 [CHROMIUM] keyboard users reach navigation, the task box, missions and Run, with visible focus", async () => {
   const { ctx, page } = await open(1366, 768);
   await page.keyboard.press("Tab");
   assert.equal(await page.evaluate(() => document.activeElement?.className), "skip");
   await page.keyboard.press("Tab");
-  assert.equal(await page.evaluate(() => document.activeElement?.textContent), "Run");
+  assert.equal(await page.evaluate(() => document.activeElement?.textContent), "Live Tasks");
   await page.keyboard.press("Tab");
   await page.keyboard.press("Tab");
+  await page.keyboard.press("Tab");
+  assert.equal(await page.evaluate(() => document.activeElement?.id), "task-text");
+  await page.keyboard.press("Tab");
+  assert.equal(await page.evaluate(() => document.activeElement?.id), "task-run");
+  assert.equal(await page.evaluate(() => getComputedStyle(document.activeElement!).outlineStyle), "solid");
+  for (let i = 0; i < 4; i++) await page.keyboard.press("Tab"); // three examples, then the missions heading
   await page.keyboard.press("Tab");
   assert.equal(await page.evaluate(() => document.activeElement?.id), "run-btn");
   const outline = await page.evaluate(() => getComputedStyle(document.activeElement!).outlineStyle);

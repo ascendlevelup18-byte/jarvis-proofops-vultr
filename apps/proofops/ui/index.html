@@ -19,7 +19,7 @@
       </div>
     </div>
     <nav class="nav" aria-label="Primary">
-      <a href="#run" data-view="run">Run</a>
+      <a href="#run" data-view="run">Live Tasks</a>
       <a href="#evidence" data-view="evidence">Evidence</a>
       <a href="#trust" data-view="trust">Trust</a>
     </nav>
@@ -27,9 +27,27 @@
   </header>
 
   <div id="content" tabindex="-1">
-    <div class="layout" id="view-run">
+    <div id="view-run">
+    <section class="composer" aria-labelledby="task-h">
+      <h2 id="task-h">You ask. JARVIS acts. ProofOps proves.</h2>
+      <form id="task-form">
+        <label for="task-text">Tell JARVIS what to do in the synthetic demo store</label>
+        <textarea id="task-text" rows="2" maxlength="500" autocomplete="off" placeholder="Add 2 jackets, apply SAVE10, and check the total is $190 without ordering."></textarea>
+        <div class="composer-actions">
+          <button id="task-run" class="primary" type="submit">Run task</button>
+          <div class="examples" role="group" aria-label="Example tasks">
+            <button type="button" class="example" data-task="Add 2 ProofOps Field Jackets to the cart, apply SAVE10, and confirm the total is $190 without placing an order.">2 jackets with SAVE10</button>
+            <button type="button" class="example" data-task="Using the faulty store, add one jacket, apply SAVE10, go to checkout, and check the total is $90 without placing an order.">Catch a wrong total</button>
+            <button type="button" class="example" data-task="Buy one jacket with code SAVE10. Place the order after I approve it.">Order, with my approval</button>
+          </div>
+        </div>
+      </form>
+      <div id="task-reply" class="task-reply" role="alert" hidden></div>
+    </section>
+    <div class="layout">
       <aside class="missions" aria-labelledby="missions-h">
-        <h2 id="missions-h">Missions</h2>
+        <details id="missions-box" open>
+        <summary><h2 id="missions-h">Guided demo missions</h2></summary>
         <div class="command">
           <p class="command-label">Selected: <strong id="selected-mission">none</strong></p>
           <button id="run-btn" class="primary" type="button" disabled>Run mission</button>
@@ -39,6 +57,7 @@
         <p class="hint">Synthetic store. The <span id="proposer">planner</span> proposes, policy decides, the browser executes, and an independent verifier decides the result.</p>
         <h3>Recent runs</h3>
         <ol id="history" class="history"></ol>
+        </details>
         <a class="all-runs" href="#evidence">Open and compare runs</a>
       </aside>
 
@@ -79,7 +98,7 @@
 
         <div class="grid">
           <section class="panel timeline-panel" aria-labelledby="timeline-h">
-            <h3 id="timeline-h">Decision timeline</h3>
+            <h3 id="timeline-h">What JARVIS is doing</h3>
             <ol id="timeline" class="timeline"><li class="empty">Steps appear here as the agent works.</li></ol>
           </section>
 
@@ -113,6 +132,7 @@
           </section>
         </div>
       </main>
+    </div>
     </div>
 
     <main class="view evidence-view" id="view-evidence" hidden>

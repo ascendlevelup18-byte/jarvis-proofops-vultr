@@ -106,11 +106,12 @@ function renderRun(out, s) {
 
   const grid = el("div", "detail-grid");
   const obj = panel("Objective and expected result");
+  if (s.userText) obj.append(el("p", "body-copy", `You asked: "${s.userText}"`));
   obj.append(el("p", "body-copy", s.task ?? s.mission?.purpose ?? "Objective not recorded."));
   obj.append(factList([
     ["Expected total", s.expected ? usd(s.expected.totalCents) : null],
     ["Orders expected", s.expected?.ordersExpected],
-    ["This mission is designed to", s.mission ? (s.mission.expected.verdict === "PASS" ? "pass" : s.mission.expected.status === "timed_out" ? "time out and fail" : "fail") : null],
+    ["This mission is designed to", s.mission ? (s.mission.expected.verdict === "OPEN" ? "be checked against the store" : s.mission.expected.verdict === "PASS" ? "pass" : s.mission.expected.status === "timed_out" ? "time out and fail" : "fail") : null],
   ]));
   grid.append(obj);
 
