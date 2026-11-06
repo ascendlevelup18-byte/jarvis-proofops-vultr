@@ -236,7 +236,7 @@ test("MC-12 [CHROMIUM] reduced-motion users get no animation", async () => {
 
 for (const [name, path, wait] of [["Run", "/", "#run-btn"], ["Evidence", `/#evidence/${WRONG}`, "#evidence-detail .outcome"], ["Comparison", `/#compare/${CORRECT}/${WRONG}`, "#compare-table"], ["Trust", "/#trust", "#trust-body .panel"]] as const) {
   test(`MC-13 [CHROMIUM] automated accessibility check has no serious issue on ${name}`, async () => {
-    const { ctx, page } = await open(1366, 768, path, { bypassCSP: true });
+    const { ctx, page } = await open(1366, 768, path, { bypassCSP: true, reducedMotion: "reduce" }); // fade-ins would skew contrast readings
     await page.waitForSelector(wait);
     await page.addScriptTag({ content: axeSource });
     const res = await page.evaluate(async () => {
