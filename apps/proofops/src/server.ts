@@ -7,7 +7,7 @@ import { readFileSync, readdirSync, mkdirSync, existsSync } from "node:fs";
 import { execFileSync } from "node:child_process";
 import { join, normalize, extname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { randomBytes, timingSafeEqual } from "node:crypto";
+import { createHash, randomBytes, timingSafeEqual } from "node:crypto";
 import type { AddressInfo } from "node:net";
 import { createStorefront } from "./storefront.ts";
 import { startSigner } from "./signer.ts";
@@ -38,8 +38,18 @@ const EVIDENCE_ROOT = resolve(ROOT, arg("evidence", SANDBOX ? "evidence" : "evid
 const DATA_DIR = resolve(ROOT, arg("data", "data-local")!);
 mkdirSync(EVIDENCE_ROOT, { recursive: true });
 mkdirSync(DATA_DIR, { recursive: true });
-// Listing full run ids makes every bundle reachable, so history is off behind a proxy unless explicitly opened.
-const OPEN_HISTORY = process.env.PROOFOPS_OPEN_HISTORY === "1" || (!TRUST_PROXY && (HOST === "127.0.0.1" || HOST === "localhost" || HOST === "::1"));
+// Listing full run ids makes every bundle reachable, and this system has no user accounts. So history is closed by
+// default: only a direct local request on a local development server gets it, unless an operator opens it explicitly.
+const HISTORY_ENV_OPEN = process.env.PROOFOPS_OPEN_HISTORY === "1";
+const LOOPBACK_HOST = /^(127\.0\.0\.1|localhost|\[::1\])(:\d+)?$/i;
+const LOCAL_DEV_SERVER = !TRUST_PROXY && !SANDBOX && (HOST === "127.0.0.1" || HOST === "localhost" || HOST === "::1");
+if (HISTORY_ENV_OPEN) console.warn("PROOFOPS_OPEN_HISTORY=1: run history has no authentication. Anyone who can reach this server can read every run.");
+function historyAllowed(req: IncomingMessage): boolean {
+  if (HISTORY_ENV_OPEN) return true;
+  if (!LOCAL_DEV_SERVER || req.headers["x-forwarded-for"] !== undefined) return false; // a proxy in front means it isn't local
+  const peer = req.socket.remoteAddress ?? "";
+  return LOOPBACK_HOST.test(String(req.headers.host ?? "")) && (peer === "127.0.0.1" || peer === "::1" || peer === "::ffff:127.0.0.1"); // Host check stops DNS rebinding
+}
 // Read-only archived bundles, such as the sealed live runs in this repository. Never written to or pruned.
 const ARCHIVE_DIRS = (arg("archive", SANDBOX ? "" : "proof/vultr-live-20261104/runs-d14d24c") ?? "").split(",").map((d) => d.trim()).filter(Boolean).map((d) => resolve(ROOT, d));
 const RUN_DIR = /^run_\d{14}_[0-9a-f]{8,16}$/;
@@ -204,15 +214,19 @@ const clientIp = (req: IncomingMessage) => {
   const xff = TRUST_PROXY ? req.headers["x-forwarded-for"] : undefined;
   return (typeof xff === "string" ? xff.split(",").at(-1)?.trim() : null) || (req.socket.remoteAddress ?? "?");
 };
-function rateLimited(req: IncomingMessage): boolean {
+function overLimit(table: Map<string, number[]>, req: IncomingMessage, limit: number): boolean {
   const ip = clientIp(req);
   const now = Date.now();
-  if (perIp.size > 5_000) perIp.clear(); // bounded memory under address spraying
-  const hits = (perIp.get(ip) ?? []).filter((t) => now - t < 60_000);
+  if (table.size > 5_000) table.clear(); // bounded memory under address spraying
+  const hits = (table.get(ip) ?? []).filter((t) => now - t < 60_000);
   hits.push(now);
-  perIp.set(ip, hits);
-  return hits.length > RUNS_PER_MINUTE;
+  table.set(ip, hits);
+  return hits.length > limit;
 }
+const rateLimited = (req: IncomingMessage) => overLimit(perIp, req, RUNS_PER_MINUTE);
+const HASHING_READS_PER_MINUTE = Math.max(Number(process.env.PROOFOPS_READS_PER_MIN ?? "240") || 240, 1);
+const readsPerIp = new Map<string, number[]>();
+const readLimited = (req: IncomingMessage) => overLimit(readsPerIp, req, HASHING_READS_PER_MINUTE);
 
 async function serveFile(res: ServerResponse, base: string, rel: string) {
   const full = normalize(join(base, rel));
@@ -255,11 +269,12 @@ const server = createServer(async (req, res) => {
     if (req.method === "GET" && p === "/api/scenarios") return json(res, 200, SCENARIOS);
     // Public history: outcomes only. Full run ids are capabilities for evidence, and paths never leave the server.
     if (req.method === "GET" && p === "/api/runs") {
-      return json(res, 200, registry.list(30).map((r) => ({ ref: r.id.slice(-8), mode: r.mode, tier: r.tier, status: r.status, verdict: r.verdict, at: r.created_at })));
+      return json(res, 200, registry.list(30).map((r) => ({ ref: createHash("sha256").update(r.id).digest("hex").slice(0, 8), mode: r.mode, tier: r.tier, status: r.status, verdict: r.verdict, at: r.created_at })));
     }
     // Read-only history of finished runs: the registry's, then any archived bundles. Newest first.
     if (req.method === "GET" && p === "/api/history") {
-      if (!OPEN_HISTORY) return json(res, 403, { error: "history_private" });
+      if (!historyAllowed(req)) return json(res, 403, { error: "history_private" });
+      if (readLimited(req)) return json(res, 429, { error: "rate_limited" });
       const ids = [...registry.list(30).map((r) => r.id).filter((id) => !runIsLive(id)), ...[...archive.keys()].filter((id) => !registry.get(id)).sort().reverse()];
       return json(res, 200, ids.map((id) => summaryOf(id)).filter((x): x is RunSummary => x !== null).map((x) => ({
         runId: x.runId, source: x.source, title: x.mission?.title ?? x.mode, tier: x.tier, status: x.status, verdict: x.verdict, outcomeClass: x.outcomeClass,
@@ -270,6 +285,7 @@ const server = createServer(async (req, res) => {
       const a = url.searchParams.get("a") ?? "";
       const b = url.searchParams.get("b") ?? "";
       if (!RUN_DIR.test(a) || !RUN_DIR.test(b)) return json(res, 400, { error: "bad_run_id" });
+      if (readLimited(req)) return json(res, 429, { error: "rate_limited" });
       if (runIsLive(a) || runIsLive(b)) return json(res, 409, { error: "run_not_finished" });
       const sa = summaryOf(a);
       const sb = summaryOf(b);
@@ -286,7 +302,7 @@ const server = createServer(async (req, res) => {
         missions: SCENARIOS.map((x) => ({ title: x.title, wallClockSeconds: x.wallClockMs / 1000, approval: x.approvals, expected: x.expected })),
         evidence: "Unkeyed SHA-256 file checksums and a separately recorded manifest hash. Not signatures. Someone who controls this host could rewrite both.",
         approvals: "Ed25519 token from a separate signer process, bound to the run, the action and the exact cart, usable once. Held in memory, so a restart ends it.",
-        openHistory: OPEN_HISTORY, archivedRuns: archive.size,
+        openHistory: historyAllowed(req), archivedRuns: archive.size,
       });
     }
     if (req.method === "POST" && p === "/api/runs") {
@@ -314,6 +330,7 @@ const server = createServer(async (req, res) => {
       }
       if (req.method === "GET" && sub === "/summary") {
         if (runIsLive(id)) return json(res, 409, { error: "run_not_finished" });
+        if (readLimited(req)) return json(res, 429, { error: "rate_limited" });
         const summary = summaryOf(id);
         return summary ? json(res, 200, summary) : json(res, 404, { error: "not_found" });
       }
@@ -355,6 +372,7 @@ const server = createServer(async (req, res) => {
         return json(res, 202, { ok: true });
       }
       if (req.method === "GET" && sub === "/verify-evidence") {
+        if (readLimited(req)) return json(res, 429, { error: "rate_limited" });
         // Re-hashes the bundle on disk and compares it with the manifest hash anchored in the registry.
         const row = registry.get(id);
         const arch = row ? undefined : archive.get(id);

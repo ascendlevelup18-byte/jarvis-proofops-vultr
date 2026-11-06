@@ -151,3 +151,40 @@ test("the summary carries no signing or credential material from the bundle", ()
   assert.equal(sha256(text).length, 64);
   assert.doesNotMatch(text, /PROOFOPS_INFERENCE_API_KEY|BEGIN [A-Z ]*PRIVATE KEY|"approval":"[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+"/);
 });
+
+test("without a recorded anchor, a sealed run can't count as verified", () => {
+  const s = readRunSummary({ runId: RUNS.correct, dir: join(LIVE, RUNS.correct), source: "archive" });
+  assert.equal(s.evidence.status, "PASS");
+  assert.equal(s.evidence.anchored, false);
+  assert.equal(s.outcomeClass, "incomplete_evidence");
+  assert.ok(s.evidence.reasons.some((r) => r.includes("no separately recorded manifest hash")));
+});
+
+test("a bundle moved to another run's id is an integrity failure", () => {
+  const t = tempCopy(RUNS.correct);
+  try {
+    const s = readRunSummary({ runId: RUNS.wrong, dir: t.dir, anchor: anchors[RUNS.correct], source: "archive" });
+    assert.equal(s.runId, RUNS.wrong);
+    const moved = join(t.dir, "..", RUNS.wrong);
+    cpSync(t.dir, moved, { recursive: true });
+    assert.equal(readRunSummary({ runId: RUNS.wrong, dir: moved, anchor: anchors[RUNS.correct], source: "archive" }).outcomeClass, "evidence_integrity_failure");
+  } finally { t.done(); }
+});
+
+test("a wrong anchor is an integrity failure, even with every file intact", () => {
+  assert.equal(readRunSummary({ runId: RUNS.correct, dir: join(LIVE, RUNS.correct), anchor: "0".repeat(64), source: "archive" }).outcomeClass, "evidence_integrity_failure");
+});
+
+test("KNOWN LIMIT: someone who rewrites files, manifest and anchor together isn't detected", () => {
+  const t = tempCopy(RUNS.correct);
+  try {
+    const report = join(t.dir, "report.md");
+    writeFileSync(report, "rewritten by someone in control of the host");
+    const m = JSON.parse(readFileSync(join(t.dir, "manifest.json"), "utf8"));
+    m.files["report.md"] = sha256(readFileSync(report));
+    const text = JSON.stringify(m, null, 2);
+    writeFileSync(join(t.dir, "manifest.json"), text);
+    const s = readRunSummary({ runId: RUNS.correct, dir: t.dir, anchor: sha256(text), source: "archive" });
+    assert.equal(s.outcomeClass, "verified_success"); // Checksums, not signatures. This test documents the limit; it isn't a goal.
+  } finally { t.done(); }
+});

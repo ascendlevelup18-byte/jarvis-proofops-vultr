@@ -205,7 +205,11 @@ export function readRunSummary(opts: { runId: string; dir: string | null; anchor
     if (value === null) notRetained.push(label);
   }
 
-  const outcomeClass = classifyOutcome({ status, verdict, outcomes, evidenceStatus, expected: scenario?.expected ?? null });
+  let outcomeClass = classifyOutcome({ status, verdict, outcomes, evidenceStatus, expected: scenario?.expected ?? null });
+  if (bundle && typeof anchor !== "string" && (evidenceStatus === "PASS" || evidenceStatus === "FAIL") && outcomeClass !== "unexpected_failure" && outcomeClass !== "cancelled") {
+    outcomeClass = "incomplete_evidence";
+    reasons.push("no separately recorded manifest hash, so a rewritten bundle couldn't be detected");
+  }
   return {
     runId, source,
     mission: scenario ? { id: scenario.id, title: scenario.title, purpose: scenario.purpose, expected: scenario.expected } : null,

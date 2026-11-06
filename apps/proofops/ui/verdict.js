@@ -47,7 +47,8 @@ export function renderOutcome(node, s) {
   node.hidden = false;
   node.className = `outcome ${o.tone}`;
   node.dataset.outcome = s.outcomeClass;
-  const reasons = s.evidence?.reasons?.length && s.evidence.status !== "PASS" && s.evidence.status !== "FAIL" ? s.evidence.reasons.slice(0, 3).join("; ") : null;
+  const showReasons = s.outcomeClass === "incomplete_evidence" || s.outcomeClass === "evidence_integrity_failure";
+  const reasons = showReasons && s.evidence?.reasons?.length ? s.evidence.reasons.slice(0, 3).join("; ") : null;
   const line = headline(s);
   node.replaceChildren(
     el("p", "outcome-label", o.label),
@@ -58,7 +59,7 @@ export function renderOutcome(node, s) {
   meta.setAttribute("aria-label", "Recorded facts");
   meta.append(
     el("li", "", `Sealed verdict: ${s.verdict ?? "none"}`),
-    el("li", s.evidence?.status === "TAMPERED" ? "bad" : "", `Evidence: ${s.evidence?.status ?? "unknown"}`),
+    el("li", s.evidence?.status === "TAMPERED" ? "bad" : "", `Evidence: ${s.evidence?.status ?? "unknown"}${s.evidence && !s.evidence.anchored ? ", no recorded anchor" : ""}`),
     el("li", "", plannerLabel(s.model?.provider, s.model?.requested)),
     el("li", "", tierLabel(s.tier)),
   );

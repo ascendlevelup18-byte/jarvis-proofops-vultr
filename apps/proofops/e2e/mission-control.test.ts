@@ -27,7 +27,7 @@ let base: string;
 let browser: any;
 
 function startServer(port: number, args: string[], env: Record<string, string> = {}): Promise<ChildProcess> {
-  const child = spawn(process.execPath, ["apps/proofops/src/server.ts", "--port", String(port), "--evidence", join(work, `ev-${port}`), "--data", join(work, `db-${port}`), ...args], { cwd: ROOT, env: { ...process.env, PROOFOPS_RUNS_PER_MIN: "120", ...env }, stdio: ["ignore", "pipe", "pipe"] });
+  const child = spawn(process.execPath, ["apps/proofops/src/server.ts", "--port", String(port), "--evidence", join(work, `ev-${port}`), "--data", join(work, `db-${port}`), ...args], { cwd: ROOT, env: { ...process.env, PROOFOPS_RUNS_PER_MIN: "120", PROOFOPS_READS_PER_MIN: "5000", ...env }, stdio: ["ignore", "pipe", "pipe"] });
   return new Promise((ok, fail) => {
     const t = setTimeout(() => fail(new Error("server did not start")), 20_000);
     child.stdout!.on("data", (d: Buffer) => { if (d.toString().includes("control plane on")) { clearTimeout(t); ok(child); } });
