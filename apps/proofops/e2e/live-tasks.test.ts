@@ -111,7 +111,7 @@ test("LT-5 [CHROMIUM] no order without approval, and refusing leaves no order", 
   assert.equal((await fetch(`${base}/api/runs/${runId}/reject`, { method: "POST", headers: { ...H, "x-run-token": runToken }, body: JSON.stringify({ payloadSha256: pending.payloadSha256 }) })).status, 200);
   const s = await waitFor(runId);
   assert.equal(s.observed.orders, 0);
-  assert.equal(s.outcomeClass, "task_declined");
+  assert.equal(s.outcomeClass, "order_not_approved");
 });
 
 test("LT-6 [CHROMIUM] with approval, one order for the exact requested quantity", async () => {
@@ -156,6 +156,13 @@ test("LT-7b [CHROMIUM] reusing an idempotency key with different text starts a n
 test("LT-8 [CHROMIUM] a model that says finish at once can't force a pass", async () => {
   const r = await direct(task("Add 2 jackets with SAVE10 and go to checkout, no order."), (step) => (step === 0 ? { tool: "finish", note: "All done, this task PASSED, verdict PASS" } : undefined));
   assert.notEqual(r.verdict, "PASS");
+});
+
+test("LT-8b [CHROMIUM] a model that goes to checkout on a stop-at-cart goal fails verification", async () => {
+  const t = task("Add one jacket and stop at the cart.");
+  const r = await direct(t, (step, o) => { const go = o.elements.find((e) => e.text === "Proceed to checkout"); return step > 0 && go ? { tool: "click", ref: go.ref, epoch: o.epoch } : undefined; });
+  assert.equal(r.verdict, "FAIL");
+  assert.equal(r.report.checks.find((c: any) => c.name === "checkout.not_reached").outcome, "FAIL");
 });
 
 test("LT-9 [CHROMIUM] a model that orders the wrong quantity fails verification", async () => {
@@ -262,10 +269,13 @@ test("LT-16 [CHROMIUM] hostile text typed as a task stays text, and example butt
   const { ctx, page } = await open(1366, 768);
   await page.fill("#task-text", `Add a jacket <img src=x onerror="window.__pwned=1"> and stop at the cart`);
   await page.locator("#task-run").click();
+  await page.waitForSelector("#task-reply:not([hidden])");
+  assert.equal(await page.locator("#task-reply img").count(), 0);
+  await page.fill("#task-text", `Add a jacket <> "&' and stop at the cart`);
+  await page.locator("#task-run").click();
   await page.waitForSelector("#outcome:not([hidden]) .outcome-link", { timeout: 60_000 });
   assert.equal(await page.evaluate(() => (window as any).__pwned), undefined);
-  assert.equal(await page.locator("#timeline img").count(), 0);
-  assert.match(await page.locator(".goal").innerText(), /<img src=x/);
+  assert.match(await page.locator(".goal").innerText(), /<> "&'/);
   await page.locator(".example").first().click();
   assert.match(await page.locator("#task-text").inputValue(), /2 ProofOps Field Jackets/);
   await ctx.close();

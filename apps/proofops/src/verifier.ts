@@ -86,6 +86,13 @@ export function verify(i: VerifierInput): VerifierReport {
       expected: true,
       observed: { server: i.server?.checkoutReached ?? null, dom: i.dom?.checkoutMarker ?? null },
     });
+  } else if (s.goal) {
+    commerce.push({
+      name: "checkout.not_reached",
+      outcome: !i.server ? "INCONCLUSIVE" : i.server.checkoutReached ? "FAIL" : "PASS",
+      expected: false,
+      observed: i.server?.checkoutReached ?? null,
+    });
   }
   commerce.push(
     !i.server

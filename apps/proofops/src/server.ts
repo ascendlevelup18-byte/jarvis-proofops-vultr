@@ -332,7 +332,7 @@ const server = createServer(async (req, res) => {
       if (!task.ok) return json(res, 422, { error: task.kind === "clarify" ? "needs_clarification" : "unsupported_task", message: task.message });
       if (active) return json(res, 409, { error: "busy" });
       if (registry.countSince(new Date(Date.now() - 86_400_000).toISOString()) >= MAX_RUNS_PER_DAY) return json(res, 429, { error: "daily_limit" });
-      const given = typeof req.headers["idempotency-key"] === "string" ? req.headers["idempotency-key"].slice(0, 128) : null;
+      const given = typeof req.headers["idempotency-key"] === "string" ? req.headers["idempotency-key"].slice(0, 100) : null;
       const key = given ? `task:${createHash("sha256").update(task.goal.userText).digest("hex").slice(0, 16)}:${given}` : null;
       const scenario: Scenario = { id: "live-task", title: "Live task", purpose: task.plannerTask, mode: task.mode, task: task.plannerTask, ordersExpected: task.goal.placeOrder ? 1 : 0,
         approvals: task.goal.placeOrder ? "operator" : "none", wallClockMs: task.wallClockMs, forcedMalicious: false, expected: { status: "completed", verdict: "OPEN" } };

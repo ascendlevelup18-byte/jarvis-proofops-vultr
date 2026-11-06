@@ -10,7 +10,7 @@ export type OutcomeClass =
   | "verified_success"
   | "designed_negative"
   | "verified_fail"
-  | "task_declined"
+  | "order_not_approved"
   | "unexpected_failure"
   | "unexpected_result"
   | "timed_out"
@@ -64,7 +64,7 @@ export type IntegrityStatus = "ANCHOR VERIFIED" | "INCOMPLETE" | "TAMPERED";
 
 /** What the mission did. Says nothing about whether its evidence is intact. */
 export function missionOutcomeOf(c: OutcomeClass): MissionOutcome {
-  return ({ verified_success: "PASS", designed_negative: "DESIGNED FAIL", verified_fail: "FAIL", task_declined: "INCOMPLETE", unexpected_failure: "FAIL", unexpected_result: "FAIL", timed_out: "TIMED OUT", cancelled: "CANCELLED", incomplete_evidence: "INCOMPLETE", evidence_integrity_failure: "NOT RELIABLE" } as const)[c];
+  return ({ verified_success: "PASS", designed_negative: "DESIGNED FAIL", verified_fail: "FAIL", order_not_approved: "INCOMPLETE", unexpected_failure: "FAIL", unexpected_result: "FAIL", timed_out: "TIMED OUT", cancelled: "CANCELLED", incomplete_evidence: "INCOMPLETE", evidence_integrity_failure: "NOT RELIABLE" } as const)[c];
 }
 
 /** Whether the files match their checksums and recorded hash. Says nothing about whether the mission succeeded. */
@@ -236,7 +236,10 @@ export function readRunSummary(opts: { runId: string; dir: string | null; anchor
   }
 
   let outcomeClass = classifyOutcome({ status, verdict, outcomes, evidenceStatus, expected: liveTask ? taskExpected : scenario?.expected ?? null });
-  if (liveTask && outcomeClass === "verified_fail" && (events ?? []).some((e) => e.type === "approval.refused") && !(events ?? []).some((e) => e.type === "approval.granted")) outcomeClass = "task_declined";
+  // Only the missing order may be failing: a wrong total or quantity is still reported as a failure.
+  const failingChecks = (Array.isArray(assertions?.checks) ? assertions.checks : []).filter((c: { outcome?: string }) => c.outcome === "FAIL").map((c: { name?: string }) => c.name);
+  const onlyMissingOrder = failingChecks.length > 0 && failingChecks.every((n: string | undefined) => n === "orders.count" || n === "checkout.reached");
+  if (liveTask && outcomeClass === "verified_fail" && onlyMissingOrder && (events ?? []).some((e) => e.type === "approval.refused") && !(events ?? []).some((e) => e.type === "approval.granted")) outcomeClass = "order_not_approved";
   if (bundle && typeof anchor !== "string" && (evidenceStatus === "PASS" || evidenceStatus === "FAIL") && outcomeClass !== "unexpected_failure" && outcomeClass !== "cancelled") {
     outcomeClass = "incomplete_evidence";
     reasons.push("no separately recorded manifest hash, so a rewritten bundle couldn't be detected");

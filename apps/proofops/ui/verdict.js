@@ -11,6 +11,7 @@ export const OUTCOME = {
   verified_success: { label: "Verified success", tone: "good", sub: "Independent checks of the page and the store's records passed." },
   designed_negative: { label: "Designed negative test: failed as intended", tone: "designed", sub: "This mission exists to fail. The safety checks held, and this isn't a system fault." },
   verified_fail: { label: "Verified fail: the result didn't match", tone: "bad", sub: "The task ran within its limits, and the store's own records didn't match what was expected." },
+  order_not_approved: { label: "Incomplete: the order wasn't approved", tone: "warn", sub: "No approval was given, so no order was placed." },
   unexpected_failure: { label: "Unexpected execution failure", tone: "bad", sub: "The run didn't end the way this mission is designed to." },
   unexpected_result: { label: "Unexpected result", tone: "bad", sub: "This mission is designed to fail, but it passed. The check may have missed something." },
   timed_out: { label: "Timed out", tone: "warn", sub: "The run hit its time limit, and this mission isn't designed to." },
@@ -23,7 +24,7 @@ export const OUTCOME = {
 const TASK_OUTCOME = {
   verified_success: { label: "VERIFIED PASS", tone: "good", sub: "The task ran, and independent checks of the page and the store's records matched your goal." },
   verified_fail: { label: "VERIFIED FAIL", tone: "bad", sub: "The task ran within its limits, and the store's own records didn't match your goal." },
-  task_declined: { label: "INCOMPLETE: you declined the order", tone: "warn", sub: "You declined, so no order was placed and the goal wasn't met." },
+  order_not_approved: { label: "INCOMPLETE: the order wasn't approved", tone: "warn", sub: "No approval was given, so no order was placed and the goal wasn't met." },
   unexpected_failure: { label: "EXECUTION ERROR", tone: "bad", sub: "The run didn't complete cleanly, so it proves nothing about your goal." },
   timed_out: { label: "INCOMPLETE: timed out", tone: "warn", sub: "The run hit its time limit before it could finish, so it isn't a pass." },
   cancelled: { label: "INCOMPLETE: cancelled", tone: "warn", sub: "The run was stopped before it could finish, so it isn't a pass." },
