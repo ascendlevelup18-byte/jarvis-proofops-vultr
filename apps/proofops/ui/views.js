@@ -308,10 +308,14 @@ export async function openCompare(a, b) {
     tbody.append(tr);
   }
   const wrap = el("div", "table-wrap");
+  wrap.tabIndex = 0;
+  wrap.setAttribute("role", "region");
+  wrap.setAttribute("aria-label", "Run comparison table");
   wrap.append(table);
   out.append(wrap);
   box.addEventListener("change", () => table.classList.toggle("only-diff", box.checked));
   $("evidence-heading").focus({ preventScroll: true });
+  out.scrollIntoView({ block: "start" }); // on narrow screens the result sits below the run list
 }
 
 export async function loadTrust() {

@@ -363,3 +363,15 @@ test("EX-16 [CHROMIUM] the published page declares a strict CSP and links only t
   assert.deepEqual(external, ["45-63-82-115.sslip.io", "github.com", "lablab.build"]);
   await ctx.close();
 });
+
+for (const [w, h] of [[375, 812], [768, 1024]] as const) {
+  test(`EX-17 [CHROMIUM] choosing a comparison brings the result into view at ${w}x${h}`, async () => {
+    const { ctx, page } = await open(w, h, "#evidence", base, {}, ".run-row");
+    await page.locator("#compare-form button").click();
+    await page.waitForSelector("#compare-table");
+    await page.waitForTimeout(200);
+    const top = await page.locator("#evidence-detail .detail-title").evaluate((n: Element) => n.getBoundingClientRect().top);
+    assert.ok(top >= 0 && top < h / 2, `title at ${top}`);
+    await ctx.close();
+  });
+}
