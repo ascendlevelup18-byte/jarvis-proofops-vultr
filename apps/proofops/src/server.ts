@@ -13,7 +13,8 @@ import { createStorefront } from "./storefront.ts";
 import { startSigner } from "./signer.ts";
 import { goalStubPlanner, stubPlanner, vultrPlanner, type Planner } from "./model.ts";
 import { interpretTask } from "./tasks.ts";
-import type { TaskGoal } from "./fixtures.ts";
+import { plannerLabel, resultFromSummary, statusFromEvent, statusFromStep, type TaskPhase, type TaskResult, type TaskStatus } from "./task-view.ts";
+import { CATALOG, formatUsd, type Sku, type TaskGoal } from "./fixtures.ts";
 import { runScenario, RUN_LIMITS, type ApprovalRequest, type RunConfig, type Tier } from "./runner.ts";
 import { SCENARIOS, findScenario, type Scenario } from "./scenarios.ts";
 import { RunStore } from "./store.ts";
@@ -121,6 +122,8 @@ interface Live {
   listeners: Set<ServerResponse>;
   /** Capability returned only to the browser that started the run; required to approve, reject or cancel it. */
   ownerToken: string;
+  /** Present only for a person's task: what chat clients read. */
+  chat: { understood: string[]; userText: string; statuses: TaskStatus[]; listeners: Set<ServerResponse>; approvalExpiresAt: string | null; result: TaskResult | null } | null;
 }
 let active: Live | null = null;
 const finished = new Map<string, Live>();
@@ -128,6 +131,33 @@ const finished = new Map<string, Live>();
 function broadcast(live: Live, type: string, data: unknown) {
   const msg = `event: ${type}\ndata: ${JSON.stringify(data)}\n\n`;
   for (const res of live.listeners) res.write(msg);
+}
+
+// ---- Chat view of a task ----
+const sse = (res: ServerResponse, type: string, data: unknown, id?: number) => res.write(`${id === undefined ? "" : `id: ${id}\n`}event: ${type}\ndata: ${JSON.stringify(data)}\n\n`);
+function chatStatus(l: Live, s: { phase: TaskPhase; message: string } | null) {
+  if (!l.chat || !s) return;
+  const status: TaskStatus = { seq: l.chat.statuses.length + 1, at: new Date().toISOString(), ...s };
+  l.chat.statuses.push(status);
+  for (const res of l.chat.listeners) sse(res, "status", status, status.seq);
+}
+function chatApproval(l: Live) {
+  const p = l.pendingApproval;
+  if (!p || !l.chat) return null;
+  const c = p.cart;
+  return { cart: { item: CATALOG[c.sku as Sku]?.name ?? c.sku, sku: c.sku, quantity: c.quantity, coupon: c.coupon, totalCents: c.totalCents, total: formatUsd(c.totalCents) }, payloadSha256: p.payloadSha256, expiresAt: l.chat.approvalExpiresAt };
+}
+function finishedTaskResult(id: string): TaskResult | null {
+  try { const s = summaryOf(id); return s ? resultFromSummary(s) : null; } catch { return null; }
+}
+const FALLBACK_ERROR = (id: string): TaskResult => ({ outcome: "EXECUTION_ERROR", message: "The run ended without a readable record, so it proves nothing about your goal.",
+  facts: { sku: null, quantity: null, coupon: null, totalCents: null, expectedTotalCents: null, ordersPlaced: null, checkoutReached: null }, planner: plannerLabel(PLANNER === "vultr" ? "vultr-serverless-inference" : "local-model-stub", MODEL),
+  evidence: { integrity: "INCOMPLETE", manifestSha256: null, summaryPath: `/api/runs/${id}/summary`, filesPath: `/api/runs/${id}/evidence/` } });
+function taskView(l: Live) {
+  const last = l.chat!.statuses.at(-1);
+  return { runId: l.runId, status: l.status, phase: l.chat!.result ? "finished" : l.pendingApproval ? "awaiting_approval" : last?.phase ?? "starting", message: l.chat!.result?.message ?? last?.message ?? "Starting.",
+    userText: l.chat!.userText, understood: l.chat!.understood, planner: plannerLabel(PLANNER === "vultr" ? "vultr-serverless-inference" : "local-model-stub", MODEL), isolation: SANDBOX ? "gvisor" : "none (local development)",
+    statuses: l.chat!.statuses, approval: chatApproval(l), result: l.chat!.result };
 }
 
 function snapshot(l: Live) {
@@ -138,12 +168,13 @@ function snapshot(l: Live) {
   };
 }
 
-async function startRun(scenario: Scenario, idempotencyKey: string | null, goal?: TaskGoal): Promise<{ runId: string; created: boolean; runToken?: string }> {
+async function startRun(scenario: Scenario, idempotencyKey: string | null, goal?: TaskGoal, chat?: { understood: string[]; userText: string }): Promise<{ runId: string; created: boolean; runToken?: string }> {
   const runId = `run_${new Date().toISOString().replace(/[-:.TZ]/g, "").slice(0, 14)}_${randomBytes(8).toString("hex")}`;
   const reg = registry.create({ id: runId, idempotencyKey, mode: scenario.mode, tier: TIER });
   if (!reg.created) return { runId: reg.run.id, created: false };
   registry.update(runId, { status: "running" });
-  const live: Live = { runId, scenario, status: "running", events: [], steps: [], pendingApproval: null, abort: new AbortController(), result: null, listeners: new Set(), ownerToken: randomBytes(24).toString("hex") };
+  const live: Live = { runId, scenario, status: "running", events: [], steps: [], pendingApproval: null, abort: new AbortController(), result: null, listeners: new Set(), ownerToken: randomBytes(24).toString("hex"),
+    chat: chat ? { ...chat, statuses: [], listeners: new Set(), approvalExpiresAt: null, result: null } : null };
   active = live;
   const cfg: RunConfig = {
     runId, mode: scenario.mode, task: scenario.task, ordersExpected: scenario.ordersExpected,
@@ -156,6 +187,7 @@ async function startRun(scenario: Scenario, idempotencyKey: string | null, goal?
     observer: (e) => {
       (e.kind === "event" ? live.events : live.steps).push(e.data);
       broadcast(live, e.kind, e.data);
+      chatStatus(live, e.kind === "event" ? statusFromEvent(e.data as Record<string, any>) : statusFromStep(e.data as Record<string, any>));
     },
     approval: scenario.approvals === "operator"
       ? (req) => new Promise<string | null>((resolveApproval) => {
@@ -164,6 +196,10 @@ async function startRun(scenario: Scenario, idempotencyKey: string | null, goal?
           live.pendingApproval = { ...req, resolve: settle };
           live.status = "awaiting_approval";
           broadcast(live, "approval", snapshot(live).pendingApproval);
+          if (live.chat) {
+            live.chat.approvalExpiresAt = new Date(Date.now() + 120_000).toISOString();
+            for (const res of live.chat.listeners) sse(res, "approval", chatApproval(live));
+          }
           live.abort.signal.addEventListener("abort", () => settle(null), { once: true });
         })
       : undefined,
@@ -180,6 +216,12 @@ async function startRun(scenario: Scenario, idempotencyKey: string | null, goal?
       registry.update(runId, { status: "failed", error: e.message });
     })
     .finally(() => {
+      if (live.chat) {
+        live.chat.result = finishedTaskResult(runId) ?? FALLBACK_ERROR(runId);
+        chatStatus(live, { phase: "finished", message: live.chat.result.message });
+        for (const res of live.chat.listeners) { sse(res, "result", live.chat.result); res.end(); }
+        live.chat.listeners.clear();
+      }
       broadcast(live, "done", snapshot(live));
       for (const res of live.listeners) res.end();
       live.listeners.clear();
@@ -264,6 +306,9 @@ const ownerOk = (req: IncomingMessage, live: Live | undefined | null) => {
   return want.length > 0 && given.length === want.length && timingSafeEqual(given, want);
 };
 
+/** Run details hold task text and execution traces. There are no accounts, so only the run's owner or a local operator reads them. */
+const detailsAllowed = (req: IncomingMessage, live: Live | undefined | null) => historyAllowed(req) || ownerOk(req, live);
+
 const server = createServer(async (req, res) => {
   try {
     const url = new URL(req.url ?? "/", "http://ui.local");
@@ -290,6 +335,7 @@ const server = createServer(async (req, res) => {
     if (req.method === "GET" && p === "/api/compare") {
       const a = url.searchParams.get("a") ?? "";
       const b = url.searchParams.get("b") ?? "";
+      if (!historyAllowed(req)) return json(res, 403, { error: "history_private" });
       if (!RUN_DIR.test(a) || !RUN_DIR.test(b)) return json(res, 400, { error: "bad_run_id" });
       if (readLimited(req)) return json(res, 429, { error: "rate_limited" });
       if (runIsLive(a) || runIsLive(b)) return json(res, 409, { error: "run_not_finished" });
@@ -336,14 +382,39 @@ const server = createServer(async (req, res) => {
       const key = given ? `task:${createHash("sha256").update(task.goal.userText).digest("hex").slice(0, 16)}:${given}` : null;
       const scenario: Scenario = { id: "live-task", title: "Live task", purpose: task.plannerTask, mode: task.mode, task: task.plannerTask, ordersExpected: task.goal.placeOrder ? 1 : 0,
         approvals: task.goal.placeOrder ? "operator" : "none", wallClockMs: task.wallClockMs, forcedMalicious: false, expected: { status: "completed", verdict: "OPEN" } };
-      const started = await startRun(scenario, key, task.goal);
-      return json(res, 202, { ...started, understood: task.understood, plannerTask: task.plannerTask, userText: task.goal.userText });
+      const started = await startRun(scenario, key, task.goal, { understood: task.understood, userText: task.goal.userText });
+      return json(res, 202, { ...started, understood: task.understood, plannerTask: task.plannerTask, userText: task.goal.userText,
+        planner: plannerLabel(PLANNER === "vultr" ? "vultr-serverless-inference" : "local-model-stub", MODEL) });
+    }
+    // Chat view of a task: concise statuses and a final result. Traces stay on the restricted run routes below.
+    const tv = /^\/api\/tasks\/(run_[0-9]{14}_[0-9a-f]{8,16})(\/events)?$/.exec(p);
+    if (tv && req.method === "GET") {
+      const id = tv[1]!;
+      const live = active?.runId === id ? active : finished.get(id);
+      if (!detailsAllowed(req, live)) return json(res, 403, { error: "not_run_owner" });
+      if (!tv[2]) {
+        if (live?.chat) return json(res, 200, taskView(live));
+        const row = registry.get(id);
+        const result = row && !live ? finishedTaskResult(id) : null;
+        return result ? json(res, 200, { runId: id, status: row!.status, phase: "finished", message: result.message, result }) : json(res, 404, { error: "not_found" });
+      }
+      if (!live?.chat) return json(res, 404, { error: "not_found" });
+      if (live.chat.listeners.size >= MAX_LISTENERS) return json(res, 503, { error: "too_many_viewers" });
+      res.writeHead(200, { "content-type": "text/event-stream", "cache-control": "no-store", connection: "keep-alive", ...SECURITY_HEADERS });
+      const after = Number(req.headers["last-event-id"] ?? 0) || 0;
+      for (const s of live.chat.statuses) if (s.seq > after) sse(res, "status", s, s.seq);
+      if (live.chat.result) { sse(res, "result", live.chat.result); return res.end(); }
+      if (live.pendingApproval) sse(res, "approval", chatApproval(live));
+      live.chat.listeners.add(res);
+      req.on("close", () => live.chat?.listeners.delete(res));
+      return;
     }
     const m = /^\/api\/runs\/(run_[0-9]{14}_[0-9a-f]{8,16})(\/.*)?$/.exec(p);
     if (m) {
       const id = m[1]!;
       const sub = m[2] ?? "";
       const live = active?.runId === id ? active : finished.get(id);
+      if (req.method === "GET" && !detailsAllowed(req, live)) return json(res, 403, { error: "not_run_owner" });
       if (req.method === "GET" && sub === "") {
         if (live) return json(res, 200, snapshot(live));
         const row = registry.get(id);
