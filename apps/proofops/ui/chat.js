@@ -32,6 +32,19 @@ $('clear-chat').addEventListener('click',()=>{
   conversation.replaceChildren(); response=statusLine=resultLine=null;
   document.body.classList.remove('has-conversation');closeSettings();$('task-text').focus();
 });
+const STEP_NAMES=['Understanding','Executing','Verifying','Result'];
+function setStep(i,end){
+  if(!response)return;
+  let el=response.querySelector('.stepper');
+  if(!el){el=node('ol','stepper');el.setAttribute('aria-label','Task progress');STEP_NAMES.forEach(n=>el.append(node('li','',n)));(statusLine||response.firstChild).before(el);}
+  [...el.children].forEach((li,k)=>{
+    li.removeAttribute('aria-current');
+    if(k<i)li.dataset.state='done';
+    else if(k===i){li.dataset.state=end||'now';if(!end)li.setAttribute('aria-current','step');else if(k===3)li.setAttribute('aria-current','step');}
+    else delete li.dataset.state;
+  });
+  if(end&&i===3)el.children[3].textContent=({pass:'VERIFIED PASS',fail:'VERIFIED FAIL',warn:'INCOMPLETE'})[end]||'Result';
+}
 function ensureResponse(){if(!response)begin('Restored task');}
 function begin(text){
   closeSettings();
@@ -53,17 +66,18 @@ function begin(text){
 function notice(text){ensureResponse();let n=response.querySelector('.chat-notice');if(!n){n=node('p','chat-notice');n.setAttribute('role','status');response.append(n);}n.textContent=text;}
 function status(value){
   if(!response)return;
-  active=['running','awaiting_approval'].includes(value);$('clear-chat').disabled=active;
-  statusLine.textContent=({running:'Checking the demo store…',awaiting_approval:'Your approval is needed before the order.',completed:'Task finished. Reading the verification result…',failed:'The task could not finish.',timed_out:'The task reached its time limit.',cancelled:'Task stopped. No complete result is claimed.',unknown:'Connection lost. Task status is unknown.'})[value]||value;
+  active=['running','awaiting_approval'].includes(value);
+  setStep(value==='running'||value==='awaiting_approval'?1:value==='completed'?2:value==='cancelled'||value==='timed_out'||value==='failed'||value==='unknown'?3:0,value==='cancelled'||value==='timed_out'||value==='failed'||value==='unknown'?'warn':undefined);$('clear-chat').disabled=active;
+  statusLine.textContent=({running:'Working…',awaiting_approval:'Your approval is needed before the order.',completed:'Task finished. Reading the verification result…',failed:'The task could not finish.',timed_out:'The task reached its time limit.',cancelled:'Task stopped. No complete result is claimed.',unknown:'Connection lost. Task status is unknown.'})[value]||value;
   $('task-text').setAttribute('aria-describedby',active?'chat-busy':'task-h');
 }
 const busy=node('span','sr','A task is active. Stop it or wait before sending another.');busy.id='chat-busy';document.querySelector('.composer').append(busy);
 export const chat={
   begin,closeSettings,notice,status,
-  taskStatus(event){ensureResponse();statusLine.textContent=event.message;active=event.phase!=='finished';$('clear-chat').disabled=active;},
+  taskStatus(event){ensureResponse();statusLine.textContent=event.message;setStep(event.phase==='starting'?0:event.phase==='finished'?2:1);active=event.phase!=='finished';$('clear-chat').disabled=active;},
   taskResult(result,runId){
     ensureResponse();active=false;response.dataset.runId=runId;$('clear-chat').disabled=false;
-    resultLine.textContent=result.message;
+    resultLine.textContent=result.message;setStep(3,result.outcome==='VERIFIED_PASS'?'pass':result.outcome==='VERIFIED_FAIL'||result.outcome==='EXECUTION_ERROR'?'fail':'warn');
     statusLine.textContent=result.outcome==='VERIFIED_PASS'?'Completed and checked':result.outcome==='VERIFIED_FAIL'?'Verification failed':result.outcome==='EXECUTION_ERROR'?'Execution error':'Incomplete';
     $('chat-runtime').textContent=result.planner.label;
     response.querySelector('.chat-notice')?.remove();
