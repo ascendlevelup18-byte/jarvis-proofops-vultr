@@ -221,11 +221,14 @@ test("MC-11 [CHROMIUM] keyboard users reach navigation, the task box, missions a
   assert.equal(await page.evaluate(() => document.activeElement?.getAttribute("aria-label")), "JARVIS chat");
   await page.keyboard.press("Tab");
   assert.equal(await page.evaluate(() => document.activeElement?.id), "settings-open");
-  // Wait for the dialog to really open and close: under load, Escape can land before the modal exists.
+  // Wait for the dialog to really open and close: under load, Escape can land before the modal exists,
+  // or a Tab can land before the close event hands focus back.
   await page.keyboard.press("Enter");
   await page.waitForFunction(() => (document.getElementById("settings-dialog") as HTMLDialogElement).open);
+  // The dialog returns focus in its close event, which fires after it stops being open: wait for that event itself.
+  await page.evaluate(() => { (window as any).__closed = new Promise((r) => document.getElementById("settings-dialog")!.addEventListener("close", r, { once: true })); });
   await page.keyboard.press("Escape");
-  await page.waitForFunction(() => !(document.getElementById("settings-dialog") as HTMLDialogElement).open && document.activeElement?.id === "settings-open");
+  await page.evaluate(() => (window as any).__closed);
   assert.equal(await page.evaluate(() => document.activeElement?.id), "settings-open");
   await page.keyboard.press("Tab");
   assert.equal(await page.evaluate(() => document.activeElement?.id), "task-text");
