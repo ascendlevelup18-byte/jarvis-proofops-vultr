@@ -1,10 +1,14 @@
+let ownerFetch = (...args) => fetch(...args);
+let protectedImage = async (img, path) => { img.src = path; };
+let protectedLink = () => {};
+export function setOwnerTransport(transport) { ownerFetch = transport.ownerFetch; protectedImage = transport.protectedImage; protectedLink = transport.protectedLink; }
 // Evidence and Trust areas. Read-only: nothing here can start, approve or change a run. All page and model text is
 // inserted with textContent, because it's untrusted.
 import { el, usd, OUTCOME, plannerLabel, tierLabel, renderOutcome } from "./verdict.js";
 
 const $ = (id) => document.getElementById(id);
 const get = async (path) => {
-  const res = await fetch(path);
+  const res = await ownerFetch(path);
   const body = await res.json().catch(() => ({}));
   if (!res.ok) throw Object.assign(new Error(body.error ?? `HTTP ${res.status}`), { status: res.status });
   return body;
@@ -214,7 +218,8 @@ function renderRun(out, s) {
       a.rel = "noopener";
       const img = el("img");
       img.loading = "lazy";
-      img.src = a.href;
+      protectedImage(img, a.href).catch(() => {});
+      protectedLink(a);
       img.alt = `Recorded screenshot ${f.replace("screenshots/", "")}`;
       a.append(img);
       row.append(a);
@@ -239,6 +244,7 @@ function renderRun(out, s) {
   for (const f of s.evidence.available) {
     const a = el("a", "", f);
     a.href = source.file(s.runId, f);
+    protectedLink(a);
     a.target = "_blank";
     a.rel = "noopener";
     const li = el("li");
@@ -384,3 +390,4 @@ export async function loadTrust() {
   m.append(wrap);
   out.append(m);
 }
+

@@ -1,9 +1,11 @@
 // JARVIS ProofOps operator UI. Every indicator is driven by data from the control plane; nothing is simulated.
 import { renderOutcome, renderOutcomeUnavailable } from "./verdict.js";
-import { loadEvidenceList, loadTrust, openCompare, openRun } from "./views.js";
+import { loadEvidenceList, loadTrust, openCompare, openRun, setOwnerTransport } from "./views.js";
 
 import { chat } from "./chat.js";
+import { OwnerStream, ownerFetch, rememberOwner, protectedImage, protectedLink } from "./transport.js";
 
+setOwnerTransport({ ownerFetch, protectedImage, protectedLink });
 const $ = (id) => document.getElementById(id);
 const el = (tag, cls, text) => {
   const n = document.createElement(tag);
@@ -12,7 +14,7 @@ const el = (tag, cls, text) => {
   return n;
 };
 const api = async (path, opts = {}) => {
-  const res = await fetch(path, { ...opts, headers: { "content-type": "application/json", "x-proofops": "1", ...(opts.headers ?? {}) } });
+  const res = await ownerFetch(path, { ...opts, headers: { "content-type": "application/json", "x-proofops": "1", ...(opts.headers ?? {}) } });
   const body = await res.json().catch(() => ({}));
   if (!res.ok) throw Object.assign(new Error(body.error ?? `HTTP ${res.status}`), { status: res.status, body });
   return body;
@@ -33,7 +35,7 @@ async function loadHealth() {
     const h = await api("/api/health");
     const live = h.tier.startsWith("VULTR_GVISOR");
     const liveModel = h.planner.provider === "vultr-serverless-inference";
-    chat.runtime(liveModel ? "Vultr model" : "Scripted demo · no live AI");
+    if (!current?.live) chat.runtime(liveModel ? "Vultr model" : "Scripted demo · no live AI");
     $("proposer").textContent = liveModel ? "model" : "scripted planner";
     $("stage-propose").textContent = liveModel ? "Model proposes" : "Planner proposes";
     add(h.planner.provider === "vultr-serverless-inference" ? `Model: ${h.planner.model} (Vultr Serverless Inference)` : "Model: scripted planner (no live AI)",
@@ -137,7 +139,7 @@ function stage(name, state) {
 }
 
 function setStatus(status) {
-  chat.status(status);
+  if (!current?.live) chat.status(status);
   $("task-run").disabled = status === "running" || status === "awaiting_approval";
   const s = $("run-status");
   s.className = `status ${status}`;
@@ -204,15 +206,14 @@ function showShot(file) {
   if (!current) return;
   const src = `/api/runs/${current.runId}/evidence/${file}`;
   const token = ++shotToken;
-  const preload = new Image();
-  preload.onload = () => {
+  const screenshot = $("shot");
+  screenshot.onload = () => {
     if (token !== shotToken) return; // a newer screenshot was chosen while this one loaded
-    $("shot").src = src;
     $("shot").hidden = false;
     $("shot-empty").hidden = true;
     $("shot-label").textContent = file.replace("screenshots/", "");
   };
-  preload.src = src;
+  protectedImage(screenshot, src).catch(() => { $("shot-empty").textContent = "Screenshot unavailable."; });
   for (const b of $("thumbs").children) b.setAttribute("aria-current", String(b.dataset.file === file));
 }
 
@@ -222,7 +223,7 @@ function addShot(file) {
   b.dataset.file = file;
   b.setAttribute("aria-label", `Show ${file}`);
   const img = el("img");
-  img.src = `/api/runs/${current.runId}/evidence/${file}`;
+  protectedImage(img, `/api/runs/${current.runId}/evidence/${file}`).catch(() => {});
   img.alt = "";
   b.append(img);
   b.addEventListener("click", () => showShot(file));
@@ -231,7 +232,7 @@ function addShot(file) {
 }
 
 function onEvent(e) {
-  chat.event(e);
+  if (!current?.live) chat.event(e);
   switch (e.type) {
     case "spec.frozen": stage("propose", "active"); break;
     case "policy.decision": stage("policy", "active"); break;
@@ -252,7 +253,7 @@ function showApproval(p) {
   $("approval-element").textContent = p.element || "submit the order";
   const dl = $("approval-cart");
   dl.replaceChildren();
-  for (const [k, v] of [["Item", `${p.cart.sku} × ${p.cart.quantity}`], ["Promo code", p.cart.coupon ?? "none"], ["Order total", usd(p.cart.totalCents)]]) {
+  for (const [k, v] of [["Item", `${p.cart.item ?? p.cart.sku} × ${p.cart.quantity}`], ["Promo code", p.cart.coupon ?? "none"], ["Order total", usd(p.cart.totalCents)]]) {
     dl.append(el("dt", "", k), el("dd", "", v));
   }
   $("approval-hash").textContent = p.payloadSha256.slice(0, 24) + "…";
@@ -269,7 +270,7 @@ async function showOutcome(runId, verdict, { reveal = true } = {}) {
     catch (e) { if (e.status !== 409) break; await new Promise((r) => setTimeout(r, 300)); }
   }
   if (current?.runId !== runId) return; // another mission took over while this loaded
-  if (summary) { renderOutcome(box, summary); chat.result(summary); }
+  if (summary) { renderOutcome(box, summary); if (!current?.live) chat.result(summary); }
   else { renderOutcomeUnavailable(box, verdict); chat.unavailable(); }
   if (current?.live) addNote("RESULT", box.querySelector(".outcome-label")?.textContent ?? "No result recorded");
   const link = el("a", "outcome-link", "Open the full record");
@@ -357,6 +358,7 @@ function renderEvidence(runId, manifestSha256) {
     a.href = `/api/runs/${runId}/evidence/${f}`;
     a.target = "_blank";
     a.rel = "noopener";
+    protectedLink(a);
     li.append(a);
     ev.append(li);
   }
@@ -370,6 +372,7 @@ async function startRun() {
   $("run-btn").disabled = true;
   try {
     const { runId, runToken } = await api("/api/runs", { method: "POST", body: JSON.stringify({ scenario: scenario.id }), headers: { "idempotency-key": crypto.randomUUID() } });
+    rememberOwner(runId, runToken);
     current = { runId, running: true, runToken, live: false };
     try { sessionStorage.setItem("proofops.run", JSON.stringify({ runId, runToken, scenarioId: scenario.id })); } catch { /* optional */ }
     resetRunView(scenario, runId);
@@ -412,13 +415,16 @@ async function runTask(e) {
   $("task-run").disabled = true;
   try {
     const r = await api("/api/tasks", { method: "POST", body: JSON.stringify({ text }), headers: { "idempotency-key": crypto.randomUUID() } });
+    rememberOwner(r.runId, r.runToken);
     current = { runId: r.runId, running: true, runToken: r.runToken, live: true };
+    chat.runtime(r.planner.label);
     try { sessionStorage.setItem("proofops.run", JSON.stringify({ runId: r.runId, runToken: r.runToken, scenarioId: "live-task", plannerTask: r.plannerTask, understood: r.understood, userText: r.userText })); } catch { /* optional */ }
     resetRunView(LIVE_TASK(r.userText), r.runId);
     showUnderstood(r.understood, r.userText, r.plannerTask);
     setStatus("running");
     $("task-text").value = "";
     follow(r.runId);
+    followTask(r.runId);
   } catch (err) {
     reply.className = "task-reply";
     reply.textContent = err.body?.message ?? (err.status === 409 ? "Another task is still running. Wait for it to finish."
@@ -439,7 +445,7 @@ for (const b of document.querySelectorAll(".example")) b.addEventListener("click
 if (window.matchMedia("(max-width: 760px)").matches) $("missions-box").open = false;
 
 function follow(runId) {
-  const es = new EventSource(`/api/runs/${runId}/stream`);
+  const es = new OwnerStream(`/api/runs/${runId}/stream`);
   current.stream = es;
   let seenSteps = 0;
   let seenEvents = 0;
@@ -469,7 +475,8 @@ function follow(runId) {
   });
   es.onerror = async () => {
     if (current?.stream !== es || !current.running) return;
-    if (es.readyState !== EventSource.CLOSED) {
+    if (es.errorStatus === 403 || es.errorStatus === 401) { accessLost(); return; }
+    if (es.readyState !== 2) {
       $("run-status").textContent = "Reconnecting…";
       chat.connectionLost();
       return;
@@ -488,6 +495,45 @@ function follow(runId) {
       $("run-error").hidden = false;
     }
     loadHistory();
+  };
+}
+
+
+function accessLost() {
+  current?.stream?.close(); current?.taskStream?.close();
+  showApproval(null);
+  $("cancel-btn").hidden = true;
+  $("task-run").disabled = true;
+  chat.accessLost();
+}
+
+function followTask(runId) {
+  const stream = new OwnerStream(`/api/tasks/${runId}/events`);
+  current.taskStream = stream;
+  const finish = (result) => {
+    if (current?.runId !== runId) return;
+    stream.close();
+    showApproval(null);
+    current.running = false;
+    $("task-run").disabled = false;
+    $("cancel-btn").hidden = true;
+    chat.taskResult(result, runId);
+  };
+  stream.addEventListener("status", m => { if (current?.runId === runId) chat.taskStatus(JSON.parse(m.data)); });
+  stream.addEventListener("approval", m => { if (current?.runId === runId) { setStatus("awaiting_approval"); showApproval(JSON.parse(m.data)); } });
+  stream.addEventListener("result", m => finish(JSON.parse(m.data)));
+  stream.onerror = async () => {
+    if (current?.taskStream !== stream) return;
+    if ([401,403].includes(stream.errorStatus)) { accessLost(); return; }
+    chat.connectionLost();
+    if (stream.readyState === 2) {
+      try {
+        const task = await api(`/api/tasks/${runId}`);
+        if (current?.runId !== runId) return;
+        if (task.result) finish(task.result);
+        else chat.notice("Live updates stopped. Reload to reconnect to this task. No new task will be started.");
+      } catch (e) { if ([401,403].includes(e.status)) accessLost(); else chat.notice("The service is unavailable. Task status is unknown. Reload to reconnect; do not resend the task."); }
+    }
   };
 }
 
@@ -569,6 +615,7 @@ $("cancel-btn").addEventListener("click", async () => {
   try {
     const saved = JSON.parse(sessionStorage.getItem("proofops.run") ?? "null");
     if (saved?.runId) {
+      rememberOwner(saved.runId, saved.runToken);
       const snap = await api(`/api/runs/${saved.runId}`);
       const live = saved.scenarioId === "live-task";
       const scenario = live ? LIVE_TASK(saved.userText) : scenarios.find((s) => s.id === saved.scenarioId);
@@ -586,8 +633,11 @@ $("cancel-btn").addEventListener("click", async () => {
         if (live) showUnderstood(saved.understood, saved.userText, saved.plannerTask);
         setStatus(snap.status);
         follow(saved.runId);
+        if (live) followTask(saved.runId);
         $("run-btn").disabled = current.running;
       }
     }
-  } catch { /* nothing to reconnect to */ }
+  } catch (e) { if (e.status === 403 || e.status === 401) { chat.begin("Restore previous task"); accessLost(); } }
 })();
+
+

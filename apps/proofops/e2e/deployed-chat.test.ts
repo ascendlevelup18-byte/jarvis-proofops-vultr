@@ -44,14 +44,14 @@ async function open() {
   await page.waitForSelector("#task-text");
   return { ctx, page, denied };
 }
-const answer = (page: any) => page.waitForFunction(() => /matched your goal|verification failed|not approved|not a verified/i.test(document.querySelector(".chat-answer")?.textContent ?? ""), null, { timeout: 60_000 });
+const answer = (page: any) => page.waitForFunction(() => /verified against the store|didn't match|No approval was given|cancelled|time limit|proves nothing|incomplete/i.test(document.querySelector(".chat-answer")?.textContent ?? ""), null, { timeout: 60_000 });
 
 test("DC-1 [CHROMIUM] deployed: the owner's own task streams, shows its result and screenshots, with no access errors", async () => {
   const { ctx, page, denied } = await open();
   await page.fill("#task-text", "Add 2 ProofOps Field Jackets to the cart, apply SAVE10, and confirm the total is $190 without placing an order.");
   await page.keyboard.press("Enter");
   await answer(page);
-  assert.match(await page.locator(".chat-answer").last().innerText(), /The task matched your goal\. The cart total is \$190\.00\. No order was placed\./);
+  assert.match(await page.locator(".chat-answer").last().innerText(), /Done, and verified against the store's records: 2 × ProofOps Field Jacket, code SAVE10, total \$190\.00\. Stopped at the cart, no order placed\./);
   assert.ok((await page.locator("#thumbs img").count()) > 0);
   assert.equal(await page.locator("#thumbs img").first().evaluate((i: HTMLImageElement) => i.complete && i.naturalWidth > 0), true);
   assert.deepEqual(denied, []);
@@ -67,7 +67,7 @@ test("DC-2 [CHROMIUM] deployed: approval, then reload during approval, then appr
   await page.waitForSelector("#approval:not([hidden])", { timeout: 20_000 });
   await page.locator("#approve-btn").click();
   await answer(page);
-  assert.match(await page.locator(".chat-answer").last().innerText(), /1 synthetic order recorded/);
+  assert.match(await page.locator(".chat-answer").last().innerText(), /1 synthetic order placed with your approval/);
   assert.deepEqual(denied, []);
   await ctx.close();
 });

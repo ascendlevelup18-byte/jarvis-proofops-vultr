@@ -8,3 +8,4 @@
 .assistant-message .outcome .outcome-label{color:var(--fg)}#settings-open:hover,#settings-open:focus{color:var(--fg);background:var(--raised)}@media(max-height:750px){.welcome{padding-top:30px;padding-bottom:20px}.welcome .hello-mark{margin-bottom:14px}.welcome h1{margin-bottom:14px}.welcome>p:last-child{margin-bottom:0}}
 :root{--ink:var(--fg);--ink-2:var(--fg);--panel:var(--surface);--panel-2:var(--raised);--line-2:var(--line);--button-ink:#10241c}:root[data-theme=light]{--button-ink:#fff;--pass:#236246;--fail:#a72b20;--warn:#815200}.primary{color:var(--button-ink)}.ghost:hover{color:var(--fg);border-color:var(--accent)}.approval{scroll-margin-bottom:240px}.outcome{scroll-margin-bottom:200px}
 :root{--bg-2:var(--surface)}.shot{background:var(--surface)}.example{color:var(--fg)}.nav a,.scenario,button{transition-property:border-color,opacity}html[data-theme] .nav a{color:var(--fg)}
+.conversation .approval .mono{display:none}

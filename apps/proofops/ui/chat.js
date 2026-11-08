@@ -60,6 +60,21 @@ function status(value){
 const busy=node('span','sr','A task is active. Stop it or wait before sending another.');busy.id='chat-busy';document.querySelector('.composer').append(busy);
 export const chat={
   begin,closeSettings,notice,status,
+  taskStatus(event){ensureResponse();statusLine.textContent=event.message;active=event.phase!=='finished';$('clear-chat').disabled=active;},
+  taskResult(result,runId){
+    ensureResponse();active=false;response.dataset.runId=runId;$('clear-chat').disabled=false;
+    resultLine.textContent=result.message;
+    statusLine.textContent=result.outcome==='VERIFIED_PASS'?'Completed and checked':result.outcome==='VERIFIED_FAIL'?'Verification failed':result.outcome==='EXECUTION_ERROR'?'Execution error':'Incomplete';
+    $('chat-runtime').textContent=result.planner.label;
+    response.querySelector('.chat-notice')?.remove();
+  },
+  accessLost(){
+    ensureResponse();statusLine.textContent='Access to this task expired';
+    resultLine.textContent='Your task status is unknown. The owner token is no longer accepted. No approval or successful result is being assumed.';
+    outcome.hidden=approval.hidden=true;
+    notice('Reload to check access again. Do not resend the task while its outcome is unknown.');
+    if(!response.querySelector('.reconnect')){const b=node('button','ghost reconnect','Reconnect');b.type='button';b.addEventListener('click',()=>location.reload());response.append(b);}
+  },
   runtime(text){$('chat-runtime').textContent=text;},
   accept(lines,text){if(!response)begin(text);statusLine.textContent='I’ll check this in the demo store.';resultLine.textContent=lines.slice(0,2).join(' · ');},
   event(e){if(!statusLine)return;if(e.type==='verifier.dom_read')statusLine.textContent='Verifying the result against your goal…';},
