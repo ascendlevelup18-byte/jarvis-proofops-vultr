@@ -135,7 +135,8 @@ Each result is at the commit it actually ran on. These are separate runs, not on
 | Failure recovery | Vultr VM | `d14d24c` | Fails closed | [output](proof/release-20261104/failure-recovery-vm.txt) |
 | Live chat tasks: pass, wrong total, approval refused, hostile page | Vultr VM, gVisor, beside production | `77c8517` | 4 of 4 as expected | [runs](proof/vultr-live-20261108/README.md) |
 | gVisor boundary | Vultr VM | `77c8517`, then production `64e6714` | 24/24 each | [boundary](proof/vultr-live-20261108/vm-boundary-candidate.json) |
-| Live website QA: whole site, docs section, hostile site | Vultr VM, gVisor, beside production | `7055433`, then `fc2a367` | 1 VERIFIED FAIL (whole site, before the audit-memory fix), then 2 VERIFIED PASS | [runs](proof/vultr-live-20261108-qa/README.md) |
+| Live website QA: whole site, docs section, hostile site | Vultr VM, gVisor, beside production | `7055433`, then `fc2a367` | 1 VERIFIED FAIL (whole site, before the audit-memory fix), then 2 VERIFIED PASS (docs section; hostile whole site) | [runs](proof/vultr-live-20261108-qa/README.md) |
+| Live website QA after release: whole site, from the chat's first example | Production, public URL | `1d25050` | **VERIFIED FAIL**: opened all 9 pages, then looped and never opened the 3 broken links. Caught by the verifier, 0 orders | `run_20261108200949_97cc69c90ce6526e` |
 
 **CI:** no GitHub Actions workflow runs on `main` yet. The gate above is `npm run proofops:release`, run locally. Tiers that need the VM or a key are reported as not run by that command.
 
@@ -184,6 +185,7 @@ One active task at a time, six task starts a minute per address, 150 per rolling
 - **One instance, one mission at a time, no accounts.** One visitor can use up the shared daily cap.
 - **State in memory:** the store, approvals and live streams don't survive a restart. Only the run registry and evidence do.
 - **Approvals are at-most-once, not durable.** A token is bound to the run, the action and the exact cart, and can be used once. Twenty simultaneous submissions of one token placed one order in testing. If a checkout response were lost, a retry would be refused rather than returning a stored receipt, which is why this design isn't ready for real payments.
+- **Whole-site audits are not yet reliable.** Since the audit-memory fix, live whole-site audits have passed 1 of 2 times; the model sometimes loops between pages. The verifier marks every such run VERIFIED FAIL. Section audits are the more reliable task.
 - **Website QA covers only the built-in staging site.** Auditing a site you name would need per-origin authorization, DNS pinning and redirect checks in the gateway. That isn't built, and other sites are refused.
 - **The chat's talk answers are fixed text** built from the store's data, not a model. They don't answer general questions.
 - **`npm audit`** reports 0 vulnerabilities at this release.
