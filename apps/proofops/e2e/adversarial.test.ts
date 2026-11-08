@@ -215,8 +215,10 @@ test("A8 [CHROMIUM] after a hung run no browser process from that run survives",
   const before = count();
   const r = await run("hang", { wallClockMs: 25_000 });
   assert.equal(r.status, "timed_out");
-  await new Promise((res) => setTimeout(res, 1_500));
-  assert.ok(count() <= before, `headless browser processes leaked: before ${before}, after ${count()}`);
+  // Windows can take a few seconds to reap a killed browser tree under load: poll, then judge.
+  let after = count();
+  for (let i = 0; i < 20 && after > before; i++) { await new Promise((res) => setTimeout(res, 500)); after = count(); }
+  assert.ok(after <= before, `headless browser processes leaked: before ${before}, after ${after}`);
 });
 
 // ---------------------------------------------------------------- A9 evidence tampering
