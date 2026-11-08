@@ -4,6 +4,7 @@
 import { OpenAICompatibleClient, cleanupModelContent, redactSecrets } from "../../api/src/provider/index.ts";
 import type { Observation } from "./policy.ts";
 import type { TaskGoal } from "./fixtures.ts";
+import type { InferenceBudget } from "./inference-budget.ts";
 
 export const VULTR_INFERENCE_BASE_URL = "https://api.vultrinference.com/v1";
 
@@ -80,10 +81,14 @@ export function parseActionJson(content: string): unknown {
   }
 }
 
-export function vultrPlanner(opts: { apiKey: string; model: string; timeoutMs?: number; baseUrl?: string; retryBaseDelayMs?: number }): Planner {
+const MAX_OUTPUT_TOKENS = 600;
+
+export function vultrPlanner(opts: { apiKey: string; model: string; timeoutMs?: number; baseUrl?: string; retryBaseDelayMs?: number; budget?: InferenceBudget }): Planner {
   // baseUrl is overridable only so tests can point at a local mock; production always uses Vultr.
   const client = new OpenAICompatibleClient({
-    baseUrl: opts.baseUrl ?? VULTR_INFERENCE_BASE_URL, model: opts.model, apiKey: opts.apiKey, timeoutMs: opts.timeoutMs ?? 30_000, maxRetries: 2,
+    baseUrl: opts.baseUrl ?? VULTR_INFERENCE_BASE_URL, model: opts.model, apiKey: opts.apiKey, timeoutMs: opts.timeoutMs ?? 30_000,
+    // Under a budget there are no automatic retries: every request that leaves this process is one the budget reserved.
+    maxRetries: opts.budget ? 0 : 2,
     retryBaseDelayMs: opts.retryBaseDelayMs ?? 400,
   });
   // Generic redaction catches key-shaped strings; this also removes the exact key if a provider echoes it back.
@@ -93,22 +98,30 @@ export function vultrPlanner(opts: { apiKey: string; model: string; timeoutMs?: 
     model: opts.model,
     async next(turn, signal) {
       const started = performance.now();
+      const messages = [{ role: "system" as const, content: SYSTEM_PROMPT }, { role: "user" as const, content: userMessage(turn) }];
+      if (opts.budget && opts.budget.cfg.maxOutputTokens < MAX_OUTPUT_TOKENS) throw new Error("budget output limit is below the planner's");
+      const slot = opts.budget?.reserve(Buffer.byteLength(JSON.stringify(messages), "utf8"));
+      if (slot && !slot.ok) {
+        return { provider: "vultr-serverless-inference", requestedModel: opts.model, responseModel: null, responseId: null, usage: null, latencyMs: 0, rawContent: "", parsed: null, error: slot.reason };
+      }
       try {
         const r = await client.chatCompletions({
-          messages: [{ role: "system", content: SYSTEM_PROMPT }, { role: "user", content: userMessage(turn) }],
+          messages,
           temperature: 0,
           // The catalog lists reasoning support for the planned models. Reasoning tokens count against max_tokens,
           // so long thinking could leave an empty reply: ask for the least of it, and leave room for the action.
-          maxTokens: 600,
+          maxTokens: MAX_OUTPUT_TOKENS,
           extra: { reasoning_effort: "minimal", response_format: { type: "json_object" } },
           signal,
         });
+        if (slot?.ok) opts.budget!.settle(slot.index, r.usage ?? null);
         return {
           provider: "vultr-serverless-inference", requestedModel: opts.model, responseModel: r.model ?? null, responseId: r.id ?? null,
           usage: r.usage ?? null, latencyMs: Math.round(performance.now() - started), rawContent: scrub(r.content).slice(0, 4_000),
           parsed: parseActionJson(r.content), error: null,
         };
       } catch (e) {
+        if (slot?.ok) opts.budget!.settle(slot.index, null); // may still have been billed: keep the full reservation
         return {
           provider: "vultr-serverless-inference", requestedModel: opts.model, responseModel: null, responseId: null, usage: null,
           latencyMs: Math.round(performance.now() - started), rawContent: "", parsed: null, error: scrub(String((e as Error).message)).slice(0, 300),

@@ -13,6 +13,7 @@ import { createStorefront } from "./storefront.ts";
 import { startSigner } from "./signer.ts";
 import { goalStubPlanner, stubPlanner, vultrPlanner, type Planner } from "./model.ts";
 import { interpretTask } from "./tasks.ts";
+import { InferenceBudget } from "./inference-budget.ts";
 import { plannerLabel, resultFromSummary, statusFromEvent, statusFromStep, type TaskPhase, type TaskResult, type TaskStatus } from "./task-view.ts";
 import { CATALOG, formatUsd, type Sku, type TaskGoal } from "./fixtures.ts";
 import { runScenario, RUN_LIMITS, type ApprovalRequest, type RunConfig, type Tier } from "./runner.ts";
@@ -105,8 +106,14 @@ if (SANDBOX) {
     execFileSync("docker", ["image", "inspect", IMAGE], { stdio: "ignore" });
   } catch (e) { die(`sandbox prerequisites missing: ${(e as Error).message.split("\n")[0]}`); }
 }
+// Optional hard ceiling on live inference spend, checked before every model call (see inference-budget.ts).
+const budget = process.env.PROOFOPS_BUDGET_USD ? new InferenceBudget({
+  ceilingUsd: Number(process.env.PROOFOPS_BUDGET_USD), inputUsdPerMillion: Number(process.env.PROOFOPS_PRICE_INPUT_PER_M), outputUsdPerMillion: Number(process.env.PROOFOPS_PRICE_OUTPUT_PER_M),
+  maxOutputTokens: 600, file: resolve(DATA_DIR, "inference-budget.json"),
+}) : null;
+if (PLANNER === "vultr" && process.env.PROOFOPS_REQUIRE_BUDGET === "1" && !budget) die("PROOFOPS_REQUIRE_BUDGET=1 but no budget is configured");
 // A task goal changes which scripted walk the stub takes. It never changes which provider runs, and there's no fallback.
-const makePlanner = (goal?: TaskGoal): Planner => (PLANNER === "vultr" ? vultrPlanner({ apiKey: inferenceKey, model: MODEL! }) : goal ? goalStubPlanner(goal) : stubPlanner());
+const makePlanner = (goal?: TaskGoal): Planner => (PLANNER === "vultr" ? vultrPlanner({ apiKey: inferenceKey, model: MODEL!, budget: budget ?? undefined }) : goal ? goalStubPlanner(goal) : stubPlanner());
 const TIER: Tier = SANDBOX ? (PLANNER === "vultr" ? "VULTR_GVISOR_LIVE_MODEL" : "VULTR_GVISOR_SCRIPTED") : PLANNER === "vultr" ? "LOCAL_LIVE_MODEL" : "LOCAL_MODEL_STUB";
 
 // ---- Live run state (one mission at a time keeps the demo VM predictable) ----
@@ -330,7 +337,7 @@ const server = createServer(async (req, res) => {
     const p = url.pathname;
     if ((req.method === "GET" || req.method === "HEAD") && p === "/api/health") {
       return json(res, 200, { ok: true, service: "jarvis-proofops", tier: TIER, planner: PLANNER === "vultr" ? { provider: "vultr-serverless-inference", model: MODEL } : { provider: "local-model-stub" },
-        isolation: SANDBOX ? "gvisor-runsc" : "none (local development)", codeSha: codeSha.slice(0, 12), active: active !== null, recoveredOnStart: recovered });
+        isolation: SANDBOX ? "gvisor-runsc" : "none (local development)", codeSha: codeSha.slice(0, 12), active: active !== null, recoveredOnStart: recovered, budget: budget?.snapshot() ?? null });
     }
     if (req.method === "GET" && p === "/api/scenarios") return json(res, 200, SCENARIOS);
     // Public history: outcomes only. Full run ids are capabilities for evidence, and paths never leave the server.
