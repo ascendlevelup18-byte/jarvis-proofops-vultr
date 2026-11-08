@@ -25,3 +25,6 @@ JARVIS can't do live research. A safe version needs an approved data source and 
 ## Screenshots
 - [`public-youtube-request-desktop.jpg`](public-youtube-request-desktop.jpg): the exact request typed into the public chat on `6cc0cdc`, and its answer.
 - [`public-welcome-mobile.jpg`](public-welcome-mobile.jpg): the welcome screen at 375 px wide, with no horizontal scroll.
+
+## Judge rehearsal
+[`FINAL-JUDGE-REHEARSAL.md`](FINAL-JUDGE-REHEARSAL.md) records the rehearsal on `8ce8057`, including the three defects it found and fixed, and the rehearsal screenshots `rehearsal-*.jpg`.
