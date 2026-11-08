@@ -109,18 +109,23 @@ function renderRun(out, s) {
   out.append(head, banner);
 
   const grid = el("div", "detail-grid");
+  // A website audit has no cart or total: show what it is checked against instead of store fields.
+  const isQa = (s.checks ?? []).some((c) => typeof c?.name === "string" && c.name.startsWith("qa."));
   const obj = panel("Objective and expected result");
   if (s.userText) obj.append(el("p", "body-copy", `You asked: "${s.userText}"`));
   obj.append(el("p", "body-copy", s.task ?? s.mission?.purpose ?? "Objective not recorded."));
   obj.append(factList([
-    ["Expected total", s.expected ? usd(s.expected.totalCents) : null],
+    ...(isQa ? [["Capability", "Website QA, read-only"]] : [["Expected total", s.expected ? usd(s.expected.totalCents) : null]]),
     ["Orders expected", s.expected?.ordersExpected],
-    ["This mission is designed to", s.mission ? (s.mission.expected.verdict === "OPEN" ? "be checked against the store" : s.mission.expected.verdict === "PASS" ? "pass" : s.mission.expected.status === "timed_out" ? "time out and fail" : "fail") : null],
+    ["This mission is designed to", s.mission ? (s.mission.expected.verdict === "OPEN" ? (isQa ? "be checked against the site's real broken links" : "be checked against the store") : s.mission.expected.verdict === "PASS" ? "pass" : s.mission.expected.status === "timed_out" ? "time out and fail" : "fail") : null],
   ]));
   grid.append(obj);
 
   const seen = panel("What the store recorded");
-  seen.append(s.observed ? factList([
+  seen.append(s.observed ? factList(isQa ? [
+    ["Checkout reached", s.observed.checkoutReached],
+    ["Orders", s.observed.orders],
+  ] : [
     ["Observed total", usd(s.observed.totals?.totalCents)],
     ["Observed discount", usd(s.observed.totals?.discountCents)],
     ["Promo code", s.observed.coupon ?? "none"],
