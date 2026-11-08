@@ -221,8 +221,11 @@ test("MC-11 [CHROMIUM] keyboard users reach navigation, the task box, missions a
   assert.equal(await page.evaluate(() => document.activeElement?.getAttribute("aria-label")), "JARVIS chat");
   await page.keyboard.press("Tab");
   assert.equal(await page.evaluate(() => document.activeElement?.id), "settings-open");
+  // Wait for the dialog to really open and close: under load, Escape can land before the modal exists.
   await page.keyboard.press("Enter");
+  await page.waitForFunction(() => (document.getElementById("settings-dialog") as HTMLDialogElement).open);
   await page.keyboard.press("Escape");
+  await page.waitForFunction(() => !(document.getElementById("settings-dialog") as HTMLDialogElement).open && document.activeElement?.id === "settings-open");
   assert.equal(await page.evaluate(() => document.activeElement?.id), "settings-open");
   await page.keyboard.press("Tab");
   assert.equal(await page.evaluate(() => document.activeElement?.id), "task-text");
