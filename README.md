@@ -31,7 +31,7 @@ Type one of these into the chat. Everything is synthetic: no real sites, product
 | **Buy one jacket with code SAVE10. Place the order after I approve it.** | An approval card shows the exact cart. Only its button can approve; typing "yes" doesn't |
 | **What can you do?** or **What sells the most?** | A plain answer from the store's data, with no task started and no ranking invented |
 
-JARVIS only supports the built-in staging site and the synthetic store. It refuses other websites. One task runs at a time; if it's busy, wait and try again. Technical activity and evidence are under **Settings → Activity & Security**.
+JARVIS is a bounded execution agent, not yet an unrestricted personal assistant. It runs tasks only on the built-in staging site and the synthetic store. Before any task parser sees a message, a small intent router sorts it into talk, research, website QA, commerce, unsupported or unsafe. A request it can't execute, such as "Find the most viewed video on YouTube", gets a plain answer that this version has no authorized web access, and nothing starts. The router grants nothing: each capability still validates its own scope and policy. One task runs at a time; if it's busy, wait and try again. Technical activity and evidence are under **Settings → Activity & Security**.
 
 | Wrong total fails | Human approves the exact cart | Hung page is destroyed |
 |---|---|---|
@@ -187,6 +187,7 @@ One active task at a time, six task starts a minute per address, 150 per rolling
 - **Approvals are at-most-once, not durable.** A token is bound to the run, the action and the exact cart, and can be used once. Twenty simultaneous submissions of one token placed one order in testing. If a checkout response were lost, a retry would be refused rather than returning a stored receipt, which is why this design isn't ready for real payments.
 - **Whole-site audits are not yet reliable.** Since the audit-memory fix, live whole-site audits have passed 1 of 2 times; the model sometimes loops between pages. The verifier marks every such run VERIFIED FAIL. Section audits are the more reliable task.
 - **Website QA covers only the built-in staging site.** Auditing a site you name would need per-origin authorization, DNS pinning and redirect checks in the gateway. That isn't built, and other sites are refused.
+- **No open-web research.** JARVIS can't browse YouTube or the internet, and won't answer such questions from memory as if it had checked. Adding read-only research would need an approved data source, an allow-listed gateway route with redirect and DNS checks, and source-attributed verification. None of that is built.
 - **The chat's talk answers are fixed text** built from the store's data, not a model. They don't answer general questions.
 - **`npm audit`** reports 0 vulnerabilities at this release.
 
