@@ -177,7 +177,17 @@ export function qaStubPlanner(goal: QaGoal, inject?: (step: number, o: Observati
       if (forced !== undefined) action = forced;
       else {
         const direct = links.find((x) => frontier.includes(x.p) && inScopeLink(x.p));
-        const viaSource = links.find((x) => frontier.some((f) => seenOn.get(f) === x.p));
+        // Walk back from each unvisited link through the pages it was seen on, so a link found two levels deep is
+        // reached by clicking down from here rather than given up on at the home page.
+        const chain = (f: string) => { const out: string[] = []; for (let p = seenOn.get(f); p && !out.includes(p) && out.length < 10; p = seenOn.get(p)) out.push(p); return out; };
+        // Only step closer to the link: the next page must sit nearer to it in the chain than this one does.
+        let viaSource: (typeof links)[number] | undefined;
+        let best = Infinity;
+        for (const f of frontier) {
+          const c = chain(f);
+          const mine = here && c.includes(here) ? c.indexOf(here) : Infinity;
+          for (const x of links) { const i = c.indexOf(x.p); if (i >= 0 && i < mine && i < best) { best = i; viaSource = x; } }
+        }
         const target = direct ?? viaSource;
         if (target) action = { tool: "click", ref: target.e.ref, epoch: o.epoch };
         else if (frontier.length && here !== "/site/") action = { tool: "navigate", path: "/site/" };
