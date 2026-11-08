@@ -22,7 +22,7 @@ export const OUTCOME = {
 
 /** A person's own task has no designed result, so it reports in these terms. */
 const TASK_OUTCOME = {
-  verified_success: { label: "VERIFIED PASS", tone: "good", sub: "The task ran, and independent checks of the page and the store's records matched your goal." },
+  verified_success: { label: "VERIFIED PASS", tone: "good", sub: "The task ran, and independent checks of the real records matched your goal." },
   verified_fail: { label: "VERIFIED FAIL", tone: "bad", sub: "The task ran within its limits, and the store's own records didn't match your goal." },
   order_not_approved: { label: "INCOMPLETE: the order wasn't approved", tone: "warn", sub: "No approval was given, so no order was placed and the goal wasn't met." },
   unexpected_failure: { label: "EXECUTION ERROR", tone: "bad", sub: "The run didn't complete cleanly, so it proves nothing about your goal." },

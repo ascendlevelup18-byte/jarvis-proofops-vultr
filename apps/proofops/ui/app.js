@@ -571,7 +571,7 @@ function showView(name) {
     if (a.dataset.view === name) a.setAttribute("aria-current", "page");
     else a.removeAttribute("aria-current");
   }
-  document.title = name === "run" ? "JARVIS · Your task, checked" : `${name === "evidence" ? "Evidence" : "Trust"} · JARVIS ProofOps`;
+  document.title = name === "run" ? "JARVIS Instinct · Verified execution" : `${name === "evidence" ? "Evidence" : "Trust"} · JARVIS ProofOps`;
 }
 async function route() {
   const [head, a, b] = location.hash.replace(/^#/, "").split("/");

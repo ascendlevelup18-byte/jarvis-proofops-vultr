@@ -21,7 +21,7 @@ const PAGES: Record<string, string> = { "/": "the shop page", "/cart": "the cart
 function pageFrom(result: unknown): string | null {
   const url = /^ok (https?:\/\/\S+)/.exec(String(result ?? ""))?.[1];
   if (!url) return null;
-  try { return PAGES[new URL(url).pathname.replace(/^\/s\/[^/]+/, "") || "/"] ?? "a store page"; } catch { return null; }
+  try { return PAGES[new URL(url).pathname.replace(/^\/s\/[^/]+/, "") || "/"] ?? (/\/site(\/|$)/.test(new URL(url).pathname) ? "a site page" : "a store page"); } catch { return null; }
 }
 const words = (s: unknown) => String(s ?? "unknown").replaceAll("_", " ");
 
