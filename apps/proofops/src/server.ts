@@ -409,7 +409,8 @@ const server = createServer(async (req, res) => {
     // Live Tasks: validate the person's text into a goal, then use the same run path as every mission.
     if (req.method === "POST" && p === "/api/tasks") {
       if (!sameOrigin(req)) return json(res, 403, { error: "missing_ui_header" });
-      if (rateLimited(req)) return json(res, 429, { error: "rate_limited" });
+      // Talk and refusals cost nothing, so they share the generous read limit. Only a run uses the run limit.
+      if (readLimited(req)) return json(res, 429, { error: "rate_limited" });
       const body = await readJson(req);
       // Talk gets an answer from the store's own facts. No run, no browser, no model call.
       const talk = converse(body.text);
@@ -417,6 +418,7 @@ const server = createServer(async (req, res) => {
       const task = interpretTask(body.text);
       if (!task.ok) return json(res, 422, { kind: "answer", topic: task.kind, error: task.kind === "clarify" ? "needs_clarification" : "unsupported_task", message: task.message });
       if (active) return json(res, 409, { error: "busy" });
+      if (rateLimited(req)) return json(res, 429, { error: "rate_limited" });
       if (registry.countSince(new Date(Date.now() - 86_400_000).toISOString()) >= MAX_RUNS_PER_DAY) return json(res, 429, { error: "daily_limit" });
       const given = typeof req.headers["idempotency-key"] === "string" ? req.headers["idempotency-key"].slice(0, 100) : null;
       const key = given ? `task:${createHash("sha256").update(task.goal.userText).digest("hex").slice(0, 16)}:${given}` : null;

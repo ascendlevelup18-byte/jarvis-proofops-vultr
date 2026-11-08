@@ -72,6 +72,11 @@ test("TK-3 directions still run through the strict interpreter and the real pipe
   assert.match(((await amb.json()) as any).error, /^(needs_clarification|unsupported_task)$/);
 });
 
+test("TK-5 talk isn't held to the run limit, which still applies to runs", async () => {
+  // This server allows 120 runs a minute; talk must keep working far past that.
+  for (let i = 0; i < 130; i++) assert.equal((await send("Hello")).status, 200, `message ${i}`);
+});
+
 test("TK-4 [CHROMIUM] the chat shows a plain answer to a question, with no task status", async () => {
   const ctx = await browser.newContext({ viewport: { width: 1366, height: 768 } });
   const page = await ctx.newPage();
