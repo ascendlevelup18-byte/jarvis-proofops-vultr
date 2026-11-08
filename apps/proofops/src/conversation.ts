@@ -37,7 +37,7 @@ export function converse(input: unknown): Answer | null {
   if (/\b(best[- ]?sell\w*|sells? (?:the )?most|(?:sell|buy|order|get|bought|sold)s? (?:the )?(?:most|best)|most (?:popular|sold|bought|ordered)|top[- ]sell\w*|popular|sales|revenue|bestseller|trending)\b/.test(t)) {
     return answer("sales", `I don't have sales records for this demo store, so I can't rank items by what sells most, and I won't guess. The store only sells one product, the ${PRODUCT.name} at ${formatUsd(PRODUCT.priceCents)}.`);
   }
-  if (/\b(catalog(?:ue)?|products?|items?|inventory|what (?:do|can) (?:you|i) (?:sell|buy)|sell|stock|price|prices|cost|how much)\b/.test(t)) {
+  if (/\b(catalog(?:ue)?|products?|items?|inventory|what (?:do|can) (?:you|i) (?:sell|buy)|sell|stock|price|prices|cost|how much|cheapest|most expensive|priciest)\b/.test(t)) {
     return answer("catalog", `The demo store sells one product: the ${PRODUCT.name} (SKU DEMO-001), ${formatUsd(PRODUCT.priceCents)} each, 1 to 5 at a time. Its one valid code is ${CODES}.`);
   }
   if (/\b(codes?|coupons?|discounts?|promo\w*|vouchers?)\b/.test(t)) {

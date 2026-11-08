@@ -25,6 +25,7 @@ const STORE_DOMAIN = /\b(jackets?|proofops|cart|checkout|check out|coupons?|prom
 const OUTSIDE = /\b(youtube|videos?|internet|online|the web|web search|websites? (?:other|outside)|news|weather|wikipedia|twitter|tweets?|reddit|tiktok|instagram|facebook|linkedin|spotify|netflix|music|songs?|movies?|films?|celebrit\w*|stock (?:price|market)|exchange rate|sports?|scores?)\b/;
 const RESEARCH_VERB = /^(?:(?:can|could|would) you\s+|please\s+)?(?:research|look up|lookup|search|google|browse|find out|tell me about)\b/;
 const OUTSIDE_ACTION: [RegExp, string][] = [
+  [/\b(create|design|draw|generate|make|edit)\b.{0,40}\b(graphic|image|picture|logo|poster|banner|video|presentation|slides?|document|report|file)s?\b/, "create or edit graphics, media or files"],
   [/\b(publish|post|tweet|share)\b/, "publish or post anything"],
   [/\b(e-?mail|send (?:a |an |the )?(?:message|text|sms|dm)|text (?:him|her|them|my)|message (?:him|her|them|my))\b/, "send messages"],
   [/\b(book|reserve|schedule|calendar|meeting|call)\b/, "book, schedule or call"],
@@ -43,8 +44,10 @@ export function routeIntent(input: unknown): Routed {
   const t = text.toLowerCase().replace(/[‘’ʼ]/g, "'");
   const qa = QA_DOMAIN.test(t), store = STORE_DOMAIN.test(t);
   // Outside-world topics win over store words: "find the most viewed video" is never a product.
-  if (OUTSIDE.test(t) || (RESEARCH_VERB.test(t) && !qa && !store)) return { intent: "RESEARCH_REQUEST", message: NO_WEB };
   if (!store && !qa) for (const [re, what] of OUTSIDE_ACTION) if (re.test(t)) return { intent: "UNSUPPORTED_CAPABILITY", message: NO_ACTION(what) };
+  if (OUTSIDE.test(t) || (RESEARCH_VERB.test(t) && !qa && !store)) return { intent: "RESEARCH_REQUEST", message: NO_WEB };
+  // Placed orders are synthetic and final here: nothing can cancel, refund or change one.
+  if (/\b(cancel|refund|return|change|modify)\b.{0,30}\border\b/.test(t)) return { intent: "UNSUPPORTED_CAPABILITY", message: NO_ACTION("cancel, refund or change an order") };
   if (qa) return { intent: "WEBSITE_QA_TASK" };
   if (store) return { intent: "COMMERCE_TASK" };
   return { intent: "CONVERSATION" }; // talk, or a general question: the conversation layer answers or declines
