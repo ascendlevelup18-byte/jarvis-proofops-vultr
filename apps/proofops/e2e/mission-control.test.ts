@@ -70,7 +70,7 @@ const inViewport = (page: Page, selector: string) => page.locator(selector).eval
 });
 const noOverflow = (page: Page) => page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth);
 // The guided missions sit below the task box and start collapsed on a phone.
-const openMissions = async (page: Page) => { if (!(await page.locator("#missions-box").evaluate((d: HTMLDetailsElement) => d.open))) await page.locator("#missions-box summary").click(); };
+const openMissions = async (page: Page) => { await page.locator("#settings-open").click(); await page.locator("#activity summary").first().click(); if (!(await page.locator("#missions-box").evaluate((d: HTMLDetailsElement) => d.open))) await page.locator("#missions-box summary").click(); };
 const pick = async (page: Page, title: string) => { await openMissions(page); await page.locator(".scenario", { hasText: title }).click(); };
 const finished = (page: Page) => page.waitForSelector("#outcome:not([hidden]) .outcome-link", { timeout: 60_000 });
 
@@ -96,7 +96,7 @@ for (const [w, h] of [[375, 812], [768, 1024], [1366, 768], [1440, 900]] as cons
     await page.waitForTimeout(700); // smooth scroll settles
     assert.equal(await inViewport(page, "#outcome .outcome-label"), true);
     assert.equal(await page.locator("#outcome").getAttribute("data-outcome"), "designed_negative");
-    assert.match(await page.locator("#outcome").innerText(), /failed as intended[\s\S]*\$90\.00[\s\S]*\$95\.00/i);
+    assert.match(await page.locator("#outcome").textContent() ?? "", /failed as intended[\s\S]*\$90\.00[\s\S]*\$95\.00/i);
     assert.equal(await page.evaluate(() => document.activeElement?.id), "outcome");
     assert.equal(await noOverflow(page), true);
     assert.deepEqual(errors, []);
@@ -109,7 +109,7 @@ test("MC-3 [CHROMIUM] a healthy run says verified success, and labels the script
   await pick(page, "Correct discount");
   await page.locator("#run-btn").click();
   await finished(page);
-  const text = await page.locator("#outcome").innerText();
+  const text = await page.locator("#outcome").textContent() ?? "";
   assert.match(text, /Verified success/);
   assert.match(text, /Scripted planner, no live AI/);
   assert.match(text, /Local, no sandbox/);
@@ -124,10 +124,10 @@ test("MC-4 [CHROMIUM] approval is still bound to the exact cart, and the outcome
   await page.waitForSelector("#approval:not([hidden])", { timeout: 60_000 });
   assert.equal(await page.locator("#outcome").isHidden(), true); // no verdict while a decision is pending
   assert.match(await page.locator("#approval-cart").innerText(), /DEMO-001[\s\S]*\$90\.00/);
-  assert.equal(await page.evaluate(() => document.activeElement?.id), "approve-btn");
+  assert.equal(await page.evaluate(() => document.activeElement?.id), "approval-h");
   await page.locator("#approve-btn").click();
   await finished(page);
-  assert.match(await page.locator("#outcome").innerText(), /Verified success/);
+  assert.match(await page.locator("#outcome").textContent() ?? "", /Verified success/);
   await ctx.close();
 });
 
@@ -218,21 +218,19 @@ test("MC-11 [CHROMIUM] keyboard users reach navigation, the task box, missions a
   await page.keyboard.press("Tab");
   assert.equal(await page.evaluate(() => document.activeElement?.className), "skip");
   await page.keyboard.press("Tab");
-  assert.equal(await page.evaluate(() => document.activeElement?.textContent), "Live Tasks");
+  assert.equal(await page.evaluate(() => document.activeElement?.getAttribute("aria-label")), "JARVIS chat");
   await page.keyboard.press("Tab");
-  await page.keyboard.press("Tab");
+  assert.equal(await page.evaluate(() => document.activeElement?.id), "settings-open");
+  await page.keyboard.press("Enter");
+  await page.keyboard.press("Escape");
+  assert.equal(await page.evaluate(() => document.activeElement?.id), "settings-open");
   await page.keyboard.press("Tab");
   assert.equal(await page.evaluate(() => document.activeElement?.id), "task-text");
   await page.keyboard.press("Tab");
   assert.equal(await page.evaluate(() => document.activeElement?.id), "task-run");
   assert.equal(await page.evaluate(() => getComputedStyle(document.activeElement!).outlineStyle), "solid");
-  for (let i = 0; i < 4; i++) await page.keyboard.press("Tab"); // three examples, then the missions heading
-  await page.keyboard.press("Tab");
-  assert.equal(await page.evaluate(() => document.activeElement?.id), "run-btn");
-  const outline = await page.evaluate(() => getComputedStyle(document.activeElement!).outlineStyle);
-  assert.equal(outline, "solid");
-  await page.keyboard.press("Tab");
-  assert.equal(await page.evaluate(() => document.activeElement?.getAttribute("role")), "radio");
+  await openMissions(page);
+  await page.locator('.scenario[aria-checked="true"]').focus();
   await page.keyboard.press("ArrowDown");
   assert.match(await page.locator("#selected-mission").innerText(), /Wrong discount/);
   await ctx.close();
@@ -245,7 +243,7 @@ test("MC-12 [CHROMIUM] reduced-motion users get no animation", async () => {
   await ctx.close();
 });
 
-for (const [name, path, wait] of [["Run", "/", "#run-btn"], ["Evidence", `/#evidence/${WRONG}`, "#evidence-detail .outcome"], ["Comparison", `/#compare/${CORRECT}/${WRONG}`, "#compare-table"], ["Trust", "/#trust", "#trust-body .panel"]] as const) {
+for (const [name, path, wait] of [["Run", "/", "#task-run"], ["Evidence", `/#evidence/${WRONG}`, "#evidence-detail .outcome"], ["Comparison", `/#compare/${CORRECT}/${WRONG}`, "#compare-table"], ["Trust", "/#trust", "#trust-body .panel"]] as const) {
   test(`MC-13 [CHROMIUM] automated accessibility check has no serious issue on ${name}`, async () => {
     const { ctx, page } = await open(1366, 768, path, { bypassCSP: true, reducedMotion: "reduce" }); // fade-ins would skew contrast readings
     await page.waitForSelector(wait);

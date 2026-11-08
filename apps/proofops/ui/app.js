@@ -2,6 +2,8 @@
 import { renderOutcome, renderOutcomeUnavailable } from "./verdict.js";
 import { loadEvidenceList, loadTrust, openCompare, openRun } from "./views.js";
 
+import { chat } from "./chat.js";
+
 const $ = (id) => document.getElementById(id);
 const el = (tag, cls, text) => {
   const n = document.createElement(tag);
@@ -31,6 +33,7 @@ async function loadHealth() {
     const h = await api("/api/health");
     const live = h.tier.startsWith("VULTR_GVISOR");
     const liveModel = h.planner.provider === "vultr-serverless-inference";
+    chat.runtime(liveModel ? "Vultr model" : "Scripted demo · no live AI");
     $("proposer").textContent = liveModel ? "model" : "scripted planner";
     $("stage-propose").textContent = liveModel ? "Model proposes" : "Planner proposes";
     add(h.planner.provider === "vultr-serverless-inference" ? `Model: ${h.planner.model} (Vultr Serverless Inference)` : "Model: scripted planner (no live AI)",
@@ -41,6 +44,7 @@ async function loadHealth() {
   } catch {
     chips.length = 0;
     add("Control plane unreachable", "warn");
+    chat.runtime("Service unavailable");
   }
   $("env").replaceChildren(...chips);
 }
@@ -133,6 +137,7 @@ function stage(name, state) {
 }
 
 function setStatus(status) {
+  chat.status(status);
   $("task-run").disabled = status === "running" || status === "awaiting_approval";
   const s = $("run-status");
   s.className = `status ${status}`;
@@ -226,6 +231,7 @@ function addShot(file) {
 }
 
 function onEvent(e) {
+  chat.event(e);
   switch (e.type) {
     case "spec.frozen": stage("propose", "active"); break;
     case "policy.decision": stage("policy", "active"); break;
@@ -251,7 +257,7 @@ function showApproval(p) {
   }
   $("approval-hash").textContent = p.payloadSha256.slice(0, 24) + "…";
   $("approval").dataset.hash = p.payloadSha256;
-  $("approve-btn").focus();
+  chat.revealApproval(p.payloadSha256);
 }
 
 /** States the finished run's outcome where it can't be missed, using its recorded evidence. */
@@ -263,16 +269,15 @@ async function showOutcome(runId, verdict, { reveal = true } = {}) {
     catch (e) { if (e.status !== 409) break; await new Promise((r) => setTimeout(r, 300)); }
   }
   if (current?.runId !== runId) return; // another mission took over while this loaded
-  if (summary) renderOutcome(box, summary);
-  else renderOutcomeUnavailable(box, verdict);
+  if (summary) { renderOutcome(box, summary); chat.result(summary); }
+  else { renderOutcomeUnavailable(box, verdict); chat.unavailable(); }
   if (current?.live) addNote("RESULT", box.querySelector(".outcome-label")?.textContent ?? "No result recorded");
   const link = el("a", "outcome-link", "Open the full record");
   link.href = `#evidence/${runId}`;
   box.append(link);
   if (reveal && !$("view-run").hidden) {
     const calm = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    box.scrollIntoView({ block: "center", behavior: calm ? "auto" : "smooth" });
-    box.focus({ preventScroll: true });
+    chat.completed();
   }
 }
 
@@ -369,7 +374,7 @@ async function startRun() {
     try { sessionStorage.setItem("proofops.run", JSON.stringify({ runId, runToken, scenarioId: scenario.id })); } catch { /* optional */ }
     resetRunView(scenario, runId);
     setStatus("running");
-    $("main").focus();
+    chat.begin(scenario.purpose);
     follow(runId);
   } catch (e) {
     $("run-error").textContent = e.status === 409 ? "Another mission is still running. Wait for it to finish."
@@ -387,6 +392,7 @@ async function startRun() {
 // ---------- Live Tasks ----------
 const LIVE_TASK = (text) => ({ id: "live-task", title: "Live task", purpose: text });
 function showUnderstood(understood, userText, plannerTask) {
+  chat.accept(understood, userText);
   const li = el("li", "step goal");
   li.append(el("div", "goal-title", "JARVIS: I understand your task."), el("div", "why", `You asked: "${userText}"`));
   const ul = el("ul", "goal-list");
@@ -400,6 +406,8 @@ async function runTask(e) {
   const reply = $("task-reply");
   reply.hidden = true;
   if (starting || current?.running) return;
+  if (!text) { $("task-text").focus(); return; }
+  chat.begin(text);
   starting = true;
   $("task-run").disabled = true;
   try {
@@ -409,7 +417,7 @@ async function runTask(e) {
     resetRunView(LIVE_TASK(r.userText), r.runId);
     showUnderstood(r.understood, r.userText, r.plannerTask);
     setStatus("running");
-    $("run-title").scrollIntoView({ block: "start" });
+    $("task-text").value = "";
     follow(r.runId);
   } catch (err) {
     reply.className = "task-reply";
@@ -417,15 +425,16 @@ async function runTask(e) {
       : err.message === "daily_limit" ? "This demo has reached its daily limit. Please try again tomorrow."
       : err.status === 429 ? "Too many requests in the last minute. Try again shortly."
       : "The task couldn't be started.");
-    reply.hidden = false;
-    reply.focus?.();
+    reply.hidden = true;
+    const uncertain = !err.status || err.status >= 500;
+    chat.error(uncertain ? "The connection failed before I could confirm whether your task started. Check the current activity before sending it again." : reply.textContent, uncertain);
   } finally {
     starting = false;
     $("task-run").disabled = Boolean(current?.running);
   }
 }
 $("task-form").addEventListener("submit", runTask);
-$("task-text").addEventListener("keydown", (e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); $("task-form").requestSubmit(); } });
+$("task-text").addEventListener("keydown", (e) => { if (e.key === "Enter" && !e.shiftKey && !e.isComposing) { e.preventDefault(); $("task-form").requestSubmit(); } });
 for (const b of document.querySelectorAll(".example")) b.addEventListener("click", () => { $("task-text").value = b.dataset.task; $("task-text").focus(); });
 if (window.matchMedia("(max-width: 760px)").matches) $("missions-box").open = false;
 
@@ -462,6 +471,7 @@ function follow(runId) {
     if (current?.stream !== es || !current.running) return;
     if (es.readyState !== EventSource.CLOSED) {
       $("run-status").textContent = "Reconnecting…";
+      chat.connectionLost();
       return;
     }
     const saved = await api(`/api/runs/${runId}`).catch(() => null);
@@ -499,6 +509,7 @@ async function decide(kind) {
     }[e.message];
     $("run-error").textContent = why ?? `Could not confirm the approval response (${e.message}). Check the run timeline before retrying.`;
     $("run-error").hidden = false;
+    chat.notice($("run-error").textContent);
   } finally {
     $("approve-btn").disabled = $("reject-btn").disabled = false;
   }
@@ -506,12 +517,13 @@ async function decide(kind) {
 
 const VIEWS = ["run", "evidence", "trust"];
 function showView(name) {
+  chat.closeSettings();
   for (const v of VIEWS) $(`view-${v}`).hidden = v !== name;
   for (const a of document.querySelectorAll(".nav a")) {
     if (a.dataset.view === name) a.setAttribute("aria-current", "page");
     else a.removeAttribute("aria-current");
   }
-  document.title = name === "run" ? "JARVIS ProofOps" : `${name === "evidence" ? "Evidence" : "Trust"} · JARVIS ProofOps`;
+  document.title = name === "run" ? "JARVIS · Your task, checked" : `${name === "evidence" ? "Evidence" : "Trust"} · JARVIS ProofOps`;
 }
 async function route() {
   const [head, a, b] = location.hash.replace(/^#/, "").split("/");
@@ -537,7 +549,13 @@ $("compare-b").addEventListener("change", () => { $("compare-b").dataset.touched
 $("run-btn").addEventListener("click", startRun);
 $("approve-btn").addEventListener("click", () => decide("approve"));
 $("reject-btn").addEventListener("click", () => decide("reject"));
-$("cancel-btn").addEventListener("click", async () => { if (current) await api(`/api/runs/${current.runId}/cancel`, { method: "POST", body: "{}", headers: { "x-run-token": current.runToken ?? "" } }).catch(() => {}); });
+$("cancel-btn").addEventListener("click", async () => {
+  if (!current?.running) return;
+  $("cancel-btn").disabled = true;
+  try { await api(`/api/runs/${current.runId}/cancel`, { method: "POST", body: "{}", headers: { "x-run-token": current.runToken ?? "" } }); chat.notice("Stop requested. Waiting for the task to finish safely."); }
+  catch { chat.notice("Could not confirm Stop. The task may still be running. Reconnect before trying again."); }
+  finally { $("cancel-btn").disabled = false; }
+});
 
 (async () => {
   await loadHealth();

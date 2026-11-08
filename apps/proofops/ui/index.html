@@ -3,38 +3,39 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>JARVIS ProofOps</title>
+  <title>JARVIS · Your task, checked</title>
   <meta name="description" content="AI-proposed browser actions under policy control, with independently verifiable evidence.">
   <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="chat.css">
   <script type="module" src="app.js"></script>
 </head>
 <body>
   <a class="skip" href="#content">Skip to content</a>
   <header class="topbar">
-    <div class="brand">
-      <span class="mark" aria-hidden="true">◆</span>
-      <div>
-        <h1>JARVIS ProofOps</h1>
-        <p class="tagline">Execute. Contain. Verify.</p>
-      </div>
-    </div>
-    <nav class="nav" aria-label="Primary">
-      <a href="#run" data-view="run">Live Tasks</a>
-      <a href="#evidence" data-view="evidence">Evidence</a>
-      <a href="#trust" data-view="trust">Trust</a>
-    </nav>
-    <ul class="env" id="env" aria-label="Runtime environment"><li class="chip muted">Connecting…</li></ul>
+    <a class="brand" href="#run" aria-label="JARVIS chat"><span class="wordmark">JARVIS<span class="brand-dot">.</span></span></a>
+    <div class="header-actions"><span id="chat-runtime" class="runtime-label">Connecting…</span><button id="settings-open" class="ghost" aria-haspopup="dialog">Settings</button></div>
   </header>
+  <dialog id="settings-dialog" aria-labelledby="settings-title">
+    <div class="settings-head"><h2 id="settings-title">Settings</h2><button id="settings-close" class="ghost" aria-label="Close settings">Close</button></div>
+    <section class="settings-section"><h3>General</h3><label for="theme">Appearance</label><select id="theme"><option value="dark">Dark</option><option value="light">Light</option><option value="system">Use device setting</option></select></section>
+    <section class="settings-section"><h3>Activity &amp; Security</h3><p>Inspect the current task or recorded runs where this deployment permits access.</p><nav class="nav" aria-label="Advanced"><a href="#evidence" data-view="evidence">Recorded runs &amp; evidence</a><a href="#trust" data-view="trust">Runtime &amp; security</a></nav><details id="activity"><summary>Current task details</summary><div id="activity-content"></div></details></section>
+    <section class="settings-section"><h3>Recorded demonstration</h3><a href="/explorer/index.html" target="_blank" rel="noopener">Open the static Evidence Explorer ↗</a><p>Published demonstration bundles only. This separate read-only resource does not expose private task history.</p></section>
+    <section class="settings-section"><h3>Privacy</h3><p>This conversation stays in this tab. Reload restores the latest task when available, not a permanent chat history. Submitted tasks and evidence are retained by the server. Clearing this view does not delete server records.</p><button id="clear-chat" class="ghost">Clear this conversation view</button></section>
+    <section class="settings-section"><h3>Model &amp; Runtime</h3><ul class="env" id="env" aria-label="Runtime environment"></ul></section>
+    <section class="settings-section"><h3>About ProofOps</h3><p>A bounded commerce assistant for a synthetic demo store. No real payments. Evidence checksums share the trusted host; they are not external attestation.</p></section>
+  </dialog>
 
   <div id="content" tabindex="-1">
     <div id="view-run">
+    <section id="welcome" class="welcome"><div class="hello-mark" aria-hidden="true">J.</div><p class="eyebrow">YOUR TASK. CHECKED.</p><h1>What can I do for you?</h1><p>Check a cart. Catch a wrong total.<br>Stay in control of every order.</p></section>
+    <section id="conversation" class="conversation" aria-label="Conversation" role="log" aria-live="polite" aria-relevant="additions"></section>
     <section class="composer" aria-labelledby="task-h">
-      <h2 id="task-h">You ask. JARVIS acts. ProofOps proves.</h2>
+      <h2 id="task-h" class="sr">Ask JARVIS</h2>
       <form id="task-form">
-        <label for="task-text">Tell JARVIS what to do in the synthetic demo store</label>
+        <label for="task-text" class="sr">Your task in the demo store</label>
         <textarea id="task-text" rows="2" maxlength="500" autocomplete="off" placeholder="Add 2 jackets, apply SAVE10, and check the total is $190 without ordering."></textarea>
         <div class="composer-actions">
-          <button id="task-run" class="primary" type="submit">Run task</button>
+          <button id="task-run" class="primary" type="submit" aria-label="Send task">Send <span aria-hidden="true">↗</span></button>
           <div class="examples" role="group" aria-label="Example tasks">
             <button type="button" class="example" data-task="Add 2 ProofOps Field Jackets to the cart, apply SAVE10, and confirm the total is $190 without placing an order.">2 jackets with SAVE10</button>
             <button type="button" class="example" data-task="Using the faulty store, add one jacket, apply SAVE10, go to checkout, and check the total is $90 without placing an order.">Catch a wrong total</button>
@@ -42,7 +43,7 @@
           </div>
         </div>
       </form>
-      <div id="task-reply" class="task-reply" role="alert" hidden></div>
+      <div id="task-reply" class="task-reply" role="alert" tabindex="-1" hidden></div>
     </section>
     <div class="layout">
       <aside class="missions" aria-labelledby="missions-h">
@@ -61,7 +62,7 @@
         <a class="all-runs" href="#evidence">Open and compare runs</a>
       </aside>
 
-      <main id="main" class="run" tabindex="-1">
+      <section id="main" class="run" tabindex="-1">
         <section class="run-head" aria-live="polite">
           <div>
             <p class="eyebrow" id="run-scenario">No mission running</p>
@@ -86,8 +87,8 @@
         </ol>
 
         <section id="approval" class="approval" hidden aria-labelledby="approval-h">
-          <h3 id="approval-h">Operator approval required</h3>
-          <p>The agent wants to <strong id="approval-element">place the order</strong>. Approve only this exact cart. The signed approval is single-use, bound to this run and cart, and the store verifies it itself.</p>
+          <h3 id="approval-h" tabindex="-1">Approve this synthetic order?</h3>
+          <p>The agent wants to <strong id="approval-element">place the order</strong>. This creates a synthetic order for the exact cart below. No real payment is made. Only the buttons below can authorize or reject it.</p>
           <dl class="cart" id="approval-cart"></dl>
           <p class="mono small">Cart hash <span id="approval-hash"></span></p>
           <div class="row">
@@ -131,12 +132,12 @@
             <ul id="evidence" class="evidence"><li class="empty">Available when the run ends.</li></ul>
           </section>
         </div>
-      </main>
+      </section>
     </div>
     </div>
 
     <main class="view evidence-view" id="view-evidence" hidden>
-      <h2 id="evidence-heading" tabindex="-1">Evidence</h2>
+      <a class="back-chat" href="#run">← Back to chat</a><h2 id="evidence-heading" tabindex="-1">Evidence</h2>
       <p class="lead">Finished runs, read from their recorded evidence files. Older runs show only what they recorded.</p>
       <div class="evidence-layout">
         <aside aria-label="Finished runs">
@@ -154,14 +155,14 @@
     </main>
 
     <main class="view" id="view-trust" hidden>
-      <h2 id="trust-heading" tabindex="-1">Trust</h2>
+      <a class="back-chat" href="#run">← Back to chat</a><h2 id="trust-heading" tabindex="-1">Trust</h2>
       <p class="lead">What this deployment enforces, read from the running system.</p>
       <div id="trust-body" class="trust-body"><p class="empty">Loading…</p></div>
     </main>
   </div>
 
   <footer class="foot">
-    <p>Synthetic store, synthetic data, no real payments. Every status on this page comes from the running system or recorded evidence.</p>
+    <p>Demo store only · No real payments · Results checked against your goal</p>
   </footer>
 </body>
 </html>
