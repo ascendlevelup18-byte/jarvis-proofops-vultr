@@ -193,8 +193,9 @@ test("CH-9 hostile prompts start nothing on the real route", async () => {
   ]) {
     const r = await submit(text);
     const b = (await r.json()) as any;
-    assert.equal(r.status, 422, text);
-    assert.match(b.error, /^(unsupported_task|needs_clarification)$/, text);
+    // Refused or asked to rephrase (422), or answered as talk (200). Never a run.
+    assert.ok(r.status === 422 || (r.status === 200 && b.kind === "answer"), text);
+    if (r.status === 422) assert.match(b.error, /^(unsupported_task|needs_clarification)$/, text);
     assert.equal(b.runId, undefined, text);
     assert.equal(b.message.includes("<script"), false);
   }

@@ -61,6 +61,12 @@ function cut(text: string, re: RegExp): { rest: string; hit: boolean } {
   return { rest, hit };
 }
 
+/** The refusal for a request outside the boundary, or null. Used for talk as well as tasks. */
+export function refusalFor(text: string): string | null {
+  for (const [re, why] of REFUSED) if (re.test(text)) return `${why} ${SUPPORTED}`;
+  return null;
+}
+
 export function interpretTask(input: unknown): Interpretation {
   if (typeof input !== "string") return clarify("Please type what you'd like me to do.");
   const text = input.normalize("NFKC").replace(/[\u0000-\u001f\u007f]+/g, " ").trim();

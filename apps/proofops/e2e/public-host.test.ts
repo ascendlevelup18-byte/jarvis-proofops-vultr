@@ -57,7 +57,8 @@ test("PH-2 a state-changing request needs the public origin", async () => {
     assert.match(r.text, /wrong_origin/);
   }
   const ok = await call("POST", "/api/tasks", proxied(HOST, { ...post, origin: `https://${HOST}` }), body);
-  assert.equal(ok.status, 422); // reached the interpreter, which asks for a real task
+  assert.equal(ok.status, 200); // "hello" is talk: answered, no run
+  assert.equal(JSON.parse(ok.text).kind, "answer");
 });
 
 test("PH-3 a direct local request is the operator's and isn't affected", async () => {

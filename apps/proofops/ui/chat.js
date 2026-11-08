@@ -89,6 +89,7 @@ export const chat={
     response.querySelector('.chat-notice')?.remove();
   },
   unavailable(){ensureResponse();resultLine.textContent='The result summary is unavailable. I cannot confirm the outcome or evidence integrity.';},
+  answer(text){ensureResponse();active=false;$('clear-chat').disabled=false;statusLine.textContent='';statusLine.hidden=true;resultLine.textContent=text;response.querySelector('.details-link').hidden=true;},
   error(text,uncertain=false){active=false;$('clear-chat').disabled=false;statusLine.textContent=uncertain?'Start not confirmed':'Task not started';resultLine.textContent=text;response.querySelector('.details-link').hidden=true;},
   connectionLost(){notice('Connection interrupted. Reconnecting to the same task; no new task has been started.');statusLine.textContent='Connection interrupted';},
   completed(){if(response && !dialog.open && !(document.activeElement===$('task-text') && $('task-text').value.trim())){outcome.scrollIntoView({block:'center',behavior:'auto'});outcome.focus({preventScroll:true});}}

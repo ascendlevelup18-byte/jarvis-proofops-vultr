@@ -13,6 +13,7 @@ import { createStorefront } from "./storefront.ts";
 import { startSigner } from "./signer.ts";
 import { goalStubPlanner, stubPlanner, vultrPlanner, type Planner } from "./model.ts";
 import { interpretTask } from "./tasks.ts";
+import { converse } from "./conversation.ts";
 import { InferenceBudget } from "./inference-budget.ts";
 import { plannerLabel, resultFromSummary, statusFromEvent, statusFromStep, type TaskPhase, type TaskResult, type TaskStatus } from "./task-view.ts";
 import { CATALOG, formatUsd, type Sku, type TaskGoal } from "./fixtures.ts";
@@ -410,8 +411,11 @@ const server = createServer(async (req, res) => {
       if (!sameOrigin(req)) return json(res, 403, { error: "missing_ui_header" });
       if (rateLimited(req)) return json(res, 429, { error: "rate_limited" });
       const body = await readJson(req);
+      // Talk gets an answer from the store's own facts. No run, no browser, no model call.
+      const talk = converse(body.text);
+      if (talk) return talk.topic === "refused" ? json(res, 422, { ...talk, error: "unsupported_task" }) : json(res, 200, talk);
       const task = interpretTask(body.text);
-      if (!task.ok) return json(res, 422, { error: task.kind === "clarify" ? "needs_clarification" : "unsupported_task", message: task.message });
+      if (!task.ok) return json(res, 422, { kind: "answer", topic: task.kind, error: task.kind === "clarify" ? "needs_clarification" : "unsupported_task", message: task.message });
       if (active) return json(res, 409, { error: "busy" });
       if (registry.countSince(new Date(Date.now() - 86_400_000).toISOString()) >= MAX_RUNS_PER_DAY) return json(res, 429, { error: "daily_limit" });
       const given = typeof req.headers["idempotency-key"] === "string" ? req.headers["idempotency-key"].slice(0, 100) : null;

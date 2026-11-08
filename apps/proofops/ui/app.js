@@ -415,6 +415,7 @@ async function runTask(e) {
   $("task-run").disabled = true;
   try {
     const r = await api("/api/tasks", { method: "POST", body: JSON.stringify({ text }), headers: { "idempotency-key": crypto.randomUUID() } });
+    if (r.kind === "answer") { chat.answer(r.message); $("task-text").value = ""; return; }
     rememberOwner(r.runId, r.runToken);
     current = { runId: r.runId, running: true, runToken: r.runToken, live: true };
     chat.runtime(r.planner.label);
@@ -433,6 +434,7 @@ async function runTask(e) {
       : "The task couldn't be started.");
     reply.hidden = true;
     const uncertain = !err.status || err.status >= 500;
+    if (err.status === 422 && err.body?.message) { chat.answer(err.body.message); return; }
     chat.error(uncertain ? "The connection failed before I could confirm whether your task started. Check the current activity before sending it again." : reply.textContent, uncertain);
   } finally {
     starting = false;
