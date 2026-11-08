@@ -19,9 +19,9 @@ sudo -u proofops bash -c "cd $APP && npm ci --no-audit --no-fund"
 docker build -t proofops-worker:1.64.1 "$APP/apps/proofops/worker"
 
 if [ "$MODEL" = stub ]; then
-  printf 'PROOFOPS_PLANNER=stub\nPROOFOPS_DEPLOYMENT=%s\n' "$DEPLOYMENT" > /etc/proofops/control.env
+  printf 'PROOFOPS_PLANNER=stub\nPROOFOPS_DEPLOYMENT=%s\nPROOFOPS_PUBLIC_HOST=%s\n' "$DEPLOYMENT" "$HOSTNAME_" > /etc/proofops/control.env
 else
-  printf 'PROOFOPS_PLANNER=vultr\nPROOFOPS_MODEL=%s\nPROOFOPS_DEPLOYMENT=%s\n' "$MODEL" "$DEPLOYMENT" > /etc/proofops/control.env
+  printf 'PROOFOPS_PLANNER=vultr\nPROOFOPS_MODEL=%s\nPROOFOPS_DEPLOYMENT=%s\nPROOFOPS_PUBLIC_HOST=%s\n' "$MODEL" "$DEPLOYMENT" "$HOSTNAME_" > /etc/proofops/control.env
 fi
 # Set by the gVisor smoke test only if Chromium's inner sandbox cannot run under runsc; disclosed in each manifest.
 [ -f /etc/proofops/chromium-no-sandbox ] && echo 'PROOFOPS_CHROMIUM_NO_SANDBOX=1' >> /etc/proofops/control.env

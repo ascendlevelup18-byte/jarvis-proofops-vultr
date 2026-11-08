@@ -331,7 +331,20 @@ const ownerOk = (req: IncomingMessage, live: Live | undefined | null) => {
 /** Run details hold task text and execution traces. There are no accounts, so only the run's owner or a local operator reads them. */
 const detailsAllowed = (req: IncomingMessage, live: Live | undefined | null) => historyAllowed(req) || ownerOk(req, live) || cookieOk(req, live);
 
+// Behind the proxy, the public name is the only Host accepted, which stops DNS rebinding, and every state-changing
+// request must come from that origin. Direct local requests (no proxy header) are the operator's and are left alone.
+const PUBLIC_HOST = (process.env.PROOFOPS_PUBLIC_HOST ?? "").trim().toLowerCase();
+function hostRefused(req: IncomingMessage): string | null {
+  if (!PUBLIC_HOST || req.headers["x-forwarded-for"] === undefined) return null;
+  const host = String(req.headers.host ?? "").toLowerCase().replace(/:443$/, "");
+  if (host !== PUBLIC_HOST) return "wrong_host";
+  if (req.method !== "GET" && req.method !== "HEAD" && req.headers.origin !== `https://${PUBLIC_HOST}`) return "wrong_origin";
+  return null;
+}
+
 const server = createServer(async (req, res) => {
+  const refused = hostRefused(req);
+  if (refused) return json(res, refused === "wrong_host" ? 421 : 403, { error: refused });
   try {
     const url = new URL(req.url ?? "/", "http://ui.local");
     const p = url.pathname;
@@ -505,7 +518,7 @@ const server = createServer(async (req, res) => {
     if (req.method === "GET" || req.method === "HEAD") return serveFile(res, UI_DIR, p === "/" ? "index.html" : p.slice(1));
     return json(res, 405, { error: "method_not_allowed" });
   } catch (e) {
-    return json(res, 400, { error: "bad_request", detail: (e as Error).message.slice(0, 120) });
+    return json(res, 400, { error: "bad_request" }); // no internal detail
   }
 });
 

@@ -18,6 +18,12 @@ Environment=PROOFOPS_TRUST_PROXY=1
 Environment=PROOFOPS_RUNS_PER_MIN=6
 Environment=PROOFOPS_MAX_RUNS_PER_DAY=150
 Environment=PROOFOPS_EVIDENCE_KEEP=300
+# Hard ceiling on live inference spend for this deployment, checked before every model call (inference-budget.ts).
+# Prices are double the recorded catalog rate, so the real spend is lower. The ledger is in the data directory.
+Environment=PROOFOPS_BUDGET_USD=3
+Environment=PROOFOPS_PRICE_INPUT_PER_M=0.30
+Environment=PROOFOPS_PRICE_OUTPUT_PER_M=1.20
+Environment=PROOFOPS_REQUIRE_BUDGET=1
 # Refuses to start without runsc, the worker image, or (live planner) the key: it never falls back silently.
 ExecStart=/usr/local/bin/node apps/proofops/src/server.ts --sandbox --port 4317 --deployment ${PROOFOPS_DEPLOYMENT} --evidence /var/lib/proofops/evidence --data /var/lib/proofops/data
 # /run/proofops holds the per-run gateway sockets; recreated on each start, so stale sockets never survive.
