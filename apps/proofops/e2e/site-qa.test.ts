@@ -93,6 +93,20 @@ test("QA-6 [CHROMIUM] guessing a hidden page by navigating is refused by policy;
   assert.equal(decisions[2].policy.decision, "deny");
 });
 
+test("QA-7b the judge's wording starts an audit, not a chat answer about verification", async () => {
+  const r = await fetch(`${base}/api/tasks`, { method: "POST", headers: H, body: JSON.stringify({ text: "Find the broken links in the docs section and show me the verified findings." }) });
+  const b = (await r.json()) as any;
+  assert.equal(r.status, 202, b.message);
+  assert.ok(b.understood.includes("Scope: the docs section of the built-in staging site"));
+  let result: any = null;
+  for (let i = 0; i < 400 && !result; i++) {
+    const t = (await (await fetch(`${base}/api/tasks/${b.runId}`, { headers: { "x-run-token": b.runToken } })).json()) as any;
+    result = t.result;
+    if (!result) await new Promise((d) => setTimeout(d, 200));
+  }
+  assert.equal(result.outcome, "VERIFIED_PASS", result.message);
+});
+
 test("QA-7 [CHROMIUM] through the chat route: an audit runs and returns verified findings in plain words", async () => {
   const r = await fetch(`${base}/api/tasks`, { method: "POST", headers: H, body: JSON.stringify({ text: "Audit the staging site for broken links." }) });
   assert.equal(r.status, 202);

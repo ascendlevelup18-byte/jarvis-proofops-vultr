@@ -417,11 +417,12 @@ const server = createServer(async (req, res) => {
       // Intent first: outside-world research and unsupported actions get a truthful answer and never reach a task parser.
       const routed = routeIntent(body.text);
       if (routed.message && routed.intent !== "UNSAFE_REQUEST") return json(res, 200, { kind: "answer", topic: routed.intent.toLowerCase(), intent: routed.intent, message: routed.message, examples: [] });
-      // Talk gets an answer from the store's own facts. No run, no browser, no model call.
-      const talk = converse(body.text);
-      if (talk) return talk.topic === "refused" ? json(res, 422, { ...talk, error: "unsupported_task" }) : json(res, 200, talk);
-      // A website audit is its own capability with its own checks, on the same run path.
+      // A website audit is its own capability with its own checks, on the same run path. An audit request goes to it
+      // before talk, so a word like "verified" in "show me the verified findings" can't turn the task into a chat answer.
       const audit = interpretQa(body.text);
+      // Talk gets an answer from the store's own facts. No run, no browser, no model call. Refusals always come first.
+      const talk = routed.intent === "WEBSITE_QA_TASK" && audit ? null : converse(body.text);
+      if (talk) return talk.topic === "refused" ? json(res, 422, { ...talk, error: "unsupported_task" }) : json(res, 200, talk);
       if (audit && !audit.ok) return json(res, 422, { kind: "answer", topic: "clarify", error: "needs_clarification", message: audit.message });
       if (audit && audit.ok) {
         if (active) return json(res, 409, { error: "busy" });
