@@ -158,7 +158,7 @@ test("QA-10 [MOCK] the planner gets its own audit memory, built only from what i
   assert.match(last, /Seen but not opened yet: none/);
   const p = new AuditProgress();
   p.record({ epoch: 1, url: "http://store.proofops.test/s/abc/site/docs", title: "Docs · Northwind Staging", text: "", elements: [{ ref: "e1", tag: "a", text: "x", href: "http://store.proofops.test/s/abc/site/team" } as any, { ref: "e2", tag: "a", text: "y", href: "http://canary.proofops.test/qa" } as any] });
-  assert.equal(p.summary(), "Opened: /site/docs (Docs)\nSeen but not opened yet: /site/team");
+  assert.equal(p.summary(), "Opened: /site/docs (Docs)\nSeen but not opened yet: /site/team (link on /site/docs)");
 });
 
 test("QA-8 the truth is computed from the server's record, never from the page", () => {

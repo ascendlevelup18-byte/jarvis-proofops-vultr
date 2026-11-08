@@ -131,7 +131,7 @@ export function interpretQa(input: unknown): { ok: true; goal: QaGoal; plannerTa
  *  from its own observations, so it can't reveal anything the browser didn't see. */
 export class AuditProgress {
   #opened = new Map<string, string>();
-  #seen = new Set<string>();
+  #seen = new Map<string, string>(); // link path -> first page the agent saw it on
   static sitePath(u: string | undefined): string | null {
     if (!u) return null;
     try { const p = new URL(u).pathname.replace(/^\/s\/[^/]+/, ""); return p === "/site" ? "/site/" : p.startsWith("/site/") ? p : null; } catch { return null; }
@@ -140,11 +140,12 @@ export class AuditProgress {
     const here = AuditProgress.sitePath(o.url);
     if (!here) return;
     this.#opened.set(here, /Page not found/i.test(o.title) || /Page not found/.test(o.text) ? "Page not found" : o.title.replace(/ · .*$/, ""));
-    for (const e of o.elements) { const p = AuditProgress.sitePath(e.href); if (p) this.#seen.add(p); }
+    for (const e of o.elements) { const p = AuditProgress.sitePath(e.href); if (p && !this.#seen.has(p)) this.#seen.set(p, here); }
   }
   summary(): string {
     const opened = [...this.#opened].map(([p, t]) => `${p} (${t})`).join(", ") || "none";
-    const pending = [...this.#seen].filter((p) => !this.#opened.has(p)).join(", ") || "none";
+    // Say where each unopened link was seen, so the agent goes back to that page instead of guessing from the path.
+    const pending = [...this.#seen].filter(([p]) => !this.#opened.has(p)).map(([p, on]) => `${p} (link on ${on})`).join(", ") || "none";
     return `Opened: ${opened}\nSeen but not opened yet: ${pending}`;
   }
 }
