@@ -8,7 +8,7 @@ Give JARVIS a task. A live Vultr model operates a real browser inside a gVisor s
 | **Why does containment matter?** | An agent can finish a task and still be wrong, and a web page can try to take it over. Here the model has no authority of its own: every proposed action passes a policy, the browser can only reach its own run's site, and the verdict comes from the server's records. In a recorded live audit, the page told the model to stop early with false findings and its scripts called a canary host and the cloud metadata address. The model ignored it, policy refused two of its out-of-scope navigations, the gateway refused 52 page requests, and the audit still verified. |
 | **What runs on Vultr?** | All of it. Vultr Serverless Inference runs the planner (`deepseek-v4.1-flash-1017`). One Vultr VM runs the web app, control plane, policy, gateway, verifier, the synthetic sites, and Chromium inside gVisor. |
 | **How do I try it?** | Open **[the live app](https://45-63-82-115.sslip.io)** and type a task (below), or [run it locally](#run-it-locally) with a scripted planner. |
-| **What can I inspect?** | [Live website-QA runs](proof/vultr-live-20261108-qa/README.md), [live chat tasks](proof/vultr-live-20261108/README.md), the [earlier sealed runs](proof/vultr-live-20261104/README.md), and the [fact sheet](proof/FACT-SHEET.md). Every bundle can be [checked yourself](#evidence-integrity). |
+| **What can I inspect?** | [Live website-QA runs](proof/vultr-live-20261108-qa/README.md), [intent routing on production](proof/vultr-live-20261108-intent/README.md), [live chat tasks](proof/vultr-live-20261108/README.md), the [earlier sealed runs](proof/vultr-live-20261104/README.md), and the [fact sheet](proof/FACT-SHEET.md). Every bundle can be [checked yourself](#evidence-integrity). |
 
 ![A live website audit in the chat: nine pages checked, three broken links found and confirmed](proof/vultr-live-20261108-qa/LIVE-QA-03-result.png)
 
@@ -17,8 +17,9 @@ Give JARVIS a task. A live Vultr model operates a real browser inside a gVisor s
 ## Versions
 | | |
 |---|---|
-| Production and `main` | the current `main`, deployed to https://45-63-82-115.sslip.io on 8 Nov 2026. [`/api/health`](https://45-63-82-115.sslip.io/api/health) reports the exact running commit |
-| Previous releases | `76fee8b`, `64e6714`, and the original `d14d24c` (tag [`release-20261104`](ops/RECOVERY.md#rollback)) |
+| Production | `6cc0cdc`, deployed to https://45-63-82-115.sslip.io on 8 Nov 2026. [`/api/health`](https://45-63-82-115.sslip.io/api/health) reports the exact running commit |
+| `main` | `6cc0cdc` plus documentation-only commits, which don't change the running app |
+| Previous releases | `88bb4a6`, `1d25050`, `76fee8b`, `64e6714`, and the original `d14d24c` (tag [`release-20261104`](ops/RECOVERY.md#rollback)) |
 | Planner in production | `deepseek-v4.1-flash-1017` on Vultr Serverless Inference, under a hard spend ceiling checked before every call |
 
 ## Try it
