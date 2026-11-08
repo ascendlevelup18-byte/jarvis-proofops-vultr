@@ -14,7 +14,7 @@ const EXAMPLES = [
   "Using the faulty store, add one jacket, apply SAVE10, go to checkout, and check the total is $90 without placing an order.",
   "Buy one jacket with code SAVE10. Place the order after I approve it.",
 ];
-const CAN_DO = `I work in a synthetic demo store. I can add the ${PRODUCT.name} to the cart, apply or skip a discount code, check a total you give me, go to checkout, or place a synthetic order after you approve the exact cart. I can also audit a built-in staging website for broken links. A live model drives a sandboxed browser, and an independent check of the store's records decides whether the task really succeeded. No real payments are made.`;
+const CAN_DO = `I work in a synthetic demo store. I can add the ${PRODUCT.name} to the cart, apply or skip a discount code, check a total you give me, go to checkout, or place a synthetic order after you approve the exact cart. I can also audit a built-in staging website for broken links. A live model drives a sandboxed browser, and an independent check of the store's records decides whether the task really succeeded. No real payments are made. I can't browse the open web or act on outside accounts yet.`;
 
 const answer = (topic: string, message: string): Answer => ({ kind: "answer", topic, message, examples: EXAMPLES });
 

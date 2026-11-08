@@ -103,7 +103,8 @@ export function interpretQa(input: unknown): { ok: true; goal: QaGoal; plannerTa
   const text = input.normalize("NFKC").replace(/[\u0000-\u001f\u007f]+/g, " ").trim();
   const t = text.toLowerCase();
   if (!QA_WORDS.test(t) || !SITE_WORDS.test(t) || /\b(cart|checkout|jacket|order|buy|purchase|coupon|save\d+|total)\b/.test(t)) return null;
-  if (!/\b(broken|dead|404|links?|navigation|nav)\b/.test(t)) {
+  // A plain "audit the staging site" means the one audit this version has. Any other kind of check is declined.
+  if (!/\b(broken|dead|404|links?|navigation|nav)\b/.test(t) && (!/\b(audit|qa)\b/.test(t) || /\b(accessibility|a11y|performance|speed|seo|security|spelling|typos?|design|contrast|images?|content|copy)\b/.test(t))) {
     return { ok: false, message: "I can audit the built-in staging website for broken links. Other kinds of site checks aren't supported yet. Try: \"Audit the staging site for broken links.\"" };
   }
   const named = SECTIONS.filter((s) => new RegExp(`\\b${s}\\b`).test(t));

@@ -41,6 +41,7 @@ const VOCABULARY = new Set(`
   store page version site faulty defective buggy broken hostile malicious injection hung hanging frozen seeded bug defect
 `.trim().split(/\s+/));
 
+const RANKING = new Set("most least best worst top cheapest priciest biggest smallest newest latest oldest popular viewed highest lowest".split(" "));
 const NUMBER_WORDS: Record<string, number> = { one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, eight: 8, nine: 9, ten: 10 };
 const NUMBER = "(?:\\d+|one|two|three|four|five|six|seven|eight|nine|ten)";
 const QTY = `(?:${NUMBER}|an?|the|some|my)`;
@@ -142,7 +143,12 @@ export function interpretTask(input: unknown): Interpretation {
 
   // Product. The store has one, so anything else named as the thing to buy is refused.
   const verb = new RegExp(`\\b(?:(?:buy|add|purchase|get|find|put)\\s+(?:me\\s+)?(?:${QTY}\\s+)*|order\\s+(?:me\\s+)?(?:for\\s+)?(?:${QTY}\\s+)*)(?:(?:proofops|field)\\s+)*([a-z]+)`, "g");
-  for (const m of rest.matchAll(verb)) if (!VOCABULARY.has(m[1]!)) return unsupported(`The store doesn't sell "${m[1]}".`);
+  for (const m of rest.matchAll(verb)) {
+    if (VOCABULARY.has(m[1]!)) continue;
+    // A ranking word is not a product name: say what the store can do instead of "doesn't sell most".
+    if (RANKING.has(m[1]!)) return clarify(`I can't rank or search for items. The store has one product.`);
+    return unsupported(`The store doesn't sell "${m[1]}".`);
+  }
 
   // Every remaining word has to be understood.
   if (/(?:^|\s)-\s*\d|\d\.\d/.test(rest)) return clarify(`A quantity has to be a whole number from 1 to ${MAX_QUANTITY}.`);

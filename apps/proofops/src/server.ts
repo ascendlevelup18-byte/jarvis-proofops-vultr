@@ -14,6 +14,7 @@ import { startSigner } from "./signer.ts";
 import { goalStubPlanner, stubPlanner, vultrPlanner, type Planner } from "./model.ts";
 import { interpretTask } from "./tasks.ts";
 import { converse } from "./conversation.ts";
+import { routeIntent, ambiguousAnswer } from "./intent.ts";
 import { interpretQa, qaStubPlanner, type QaGoal } from "./site-qa.ts";
 import { InferenceBudget } from "./inference-budget.ts";
 import { plannerLabel, resultFromSummary, statusFromEvent, statusFromStep, type TaskPhase, type TaskResult, type TaskStatus } from "./task-view.ts";
@@ -413,6 +414,9 @@ const server = createServer(async (req, res) => {
       // Talk and refusals cost nothing, so they share the generous read limit. Only a run uses the run limit.
       if (readLimited(req)) return json(res, 429, { error: "rate_limited" });
       const body = await readJson(req);
+      // Intent first: outside-world research and unsupported actions get a truthful answer and never reach a task parser.
+      const routed = routeIntent(body.text);
+      if (routed.message && routed.intent !== "UNSAFE_REQUEST") return json(res, 200, { kind: "answer", topic: routed.intent.toLowerCase(), intent: routed.intent, message: routed.message, examples: [] });
       // Talk gets an answer from the store's own facts. No run, no browser, no model call.
       const talk = converse(body.text);
       if (talk) return talk.topic === "refused" ? json(res, 422, { ...talk, error: "unsupported_task" }) : json(res, 200, talk);
@@ -431,6 +435,9 @@ const server = createServer(async (req, res) => {
         return json(res, 202, { ...started, understood: audit.understood, plannerTask: audit.plannerTask, userText: audit.goal.userText,
           planner: plannerLabel(PLANNER === "vultr" ? "vultr-serverless-inference" : "local-model-stub", MODEL) }, started.runToken ? { "set-cookie": runCookies(started.runId, started.runToken) } : {});
       }
+      // Only a request about the store reaches the store parser, so ordinary words are never read as products.
+      const plain = typeof body.text === "string" ? body.text.trim() : "";
+      if (routed.intent === "CONVERSATION" && plain && plain.length <= 500) return json(res, 422, { kind: "answer", topic: "clarify", intent: "AMBIGUOUS_REQUEST", error: "needs_clarification", message: ambiguousAnswer() });
       const task = interpretTask(body.text);
       if (!task.ok) return json(res, 422, { kind: "answer", topic: task.kind, error: task.kind === "clarify" ? "needs_clarification" : "unsupported_task", message: task.message });
       if (active) return json(res, 409, { error: "busy" });

@@ -36,7 +36,7 @@ test("TK-1 talk is answered from the store's facts and starts nothing", async ()
   for (const [text, re] of [
     ["Hello", /^Hello\./], ["What can you do?", /synthetic demo store/], ["Can you help me?", /synthetic demo store/],
     ["What sells the most?", /don't have sales records/], ["What's your best-selling item?", /don't have sales records/], ["What can I buy the most of?", /don't have sales records/],
-    ["Show me the catalog.", /ProofOps Field Jacket \(SKU DEMO-001\), \$100\.00/], ["What's the weather?", /only answer questions about this demo store/],
+    ["Show me the catalog.", /ProofOps Field Jacket \(SKU DEMO-001\), \$100\.00/], ["What's the weather?", /authorized access to YouTube or the open web/], ["What is the capital of France?", /only answer questions about this demo store/], ["find the most viewed video on youtube", /authorized access to YouTube or the open web/], ["Publish this post.", /can't publish or post anything/],
   ] as const) {
     const r = await send(text);
     const b = (await r.json()) as any;
