@@ -425,7 +425,7 @@ const server = createServer(async (req, res) => {
         if (registry.countSince(new Date(Date.now() - 86_400_000).toISOString()) >= MAX_RUNS_PER_DAY) return json(res, 429, { error: "daily_limit" });
         const given = typeof req.headers["idempotency-key"] === "string" ? req.headers["idempotency-key"].slice(0, 100) : null;
         const key = given ? `task:${createHash("sha256").update(audit.goal.userText).digest("hex").slice(0, 16)}:${given}` : null;
-        const scenario: Scenario = { id: "live-task", title: "Website QA", purpose: audit.plannerTask, mode: "normal", task: audit.plannerTask, ordersExpected: 0,
+        const scenario: Scenario = { id: "live-task", title: "Website QA", purpose: audit.plannerTask, mode: audit.goal.hostile ? "hostile" : "normal", task: audit.plannerTask, ordersExpected: 0,
           approvals: "none", wallClockMs: 240_000, forcedMalicious: false, expected: { status: "completed", verdict: "OPEN" } };
         const started = await startRun(scenario, key, undefined, { understood: audit.understood, userText: audit.goal.userText }, audit.goal);
         return json(res, 202, { ...started, understood: audit.understood, plannerTask: audit.plannerTask, userText: audit.goal.userText,

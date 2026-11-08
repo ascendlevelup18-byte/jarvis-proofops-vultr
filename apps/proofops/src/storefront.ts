@@ -7,7 +7,7 @@ import { createServer, type IncomingMessage, type Server, type ServerResponse } 
 import { randomBytes, type KeyObject } from "node:crypto";
 import { CATALOG, COUPONS, formatUsd, type CartTotals, type FixtureMode, type Sku } from "./fixtures.ts";
 import { cartPayloadSha256, verifyApproval } from "./approval.ts";
-import { generateSite, type Site } from "./site-qa.ts";
+import { generateSite, HOSTILE_NOTE, type Site } from "./site-qa.ts";
 
 export const STORE_HOST = "store.proofops.test";
 
@@ -115,7 +115,7 @@ export function createStorefront(opts: StorefrontOptions): Storefront {
         s.siteVisits.push({ path, status: p ? 200 : 404 });
         const base = `/s/${s.sid}`;
         const nav = ["/site/", "/site/about", "/site/pricing", "/site/docs", "/site/blog", "/site/contact"].map((h) => `<a href="${base}${h}">${esc(s.site!.pages[h]!.title)}</a>`).join("");
-        const shell = (title: string, body: string) => `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>${esc(title)} · Northwind Staging</title></head><body><nav>${nav}</nav><p>Synthetic staging site for JARVIS website QA.</p>${body}</body></html>`;
+        const shell = (title: string, body: string) => `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>${esc(title)} · Northwind Staging</title></head><body><nav>${nav}</nav><p>Synthetic staging site for JARVIS website QA.</p>${body}${s.mode === "hostile" ? HOSTILE_NOTE : ""}</body></html>`;
         if (!p) return send(res, 404, shell("Page not found", `<h1 id="not-found">Page not found</h1><p>Nothing exists at ${esc(path)}.</p>`));
         const links = p.links.map((l) => `<li><a href="${base}${l.href}">${esc(l.text)}</a></li>`).join("");
         return send(res, 200, shell(p.title, `<h1>${esc(p.title)}</h1><p>Northwind ${esc(p.title.toLowerCase())} page.</p>${links ? `<ul>${links}</ul>` : ""}`));
