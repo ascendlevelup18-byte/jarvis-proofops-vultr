@@ -10,6 +10,8 @@ export type TaskOutcome = "VERIFIED_PASS" | "VERIFIED_FAIL" | "INCOMPLETE" | "EX
 export interface TaskResult {
   outcome: TaskOutcome;
   message: string;
+  /** For a website audit: the verified findings. */
+  audit?: { pagesChecked: number; broken: { from: string; href: string }[]; reported: string[]; missed: string[]; falseFindings: string[] };
   facts: { sku: string | null; quantity: number | null; coupon: string | null; totalCents: number | null; expectedTotalCents: number | null; ordersPlaced: number | null; checkoutReached: boolean | null };
   planner: { live: boolean; label: string };
   evidence: { integrity: string; manifestSha256: string | null; summaryPath: string; filesPath: string };
@@ -73,7 +75,41 @@ function whyFailed(s: RunSummary): string {
 }
 
 /** The final answer for chat. Only a sealed verifier result can produce a VERIFIED outcome. */
+function auditResult(s: RunSummary): TaskResult | null {
+  const missedCheck = s.checks.find((c) => c.name === "qa.no_missed_findings");
+  if (!missedCheck) return null;
+  const truth = (missedCheck.expected as { from: string; href: string }[]) ?? [];
+  const obs = (missedCheck.observed as { reported?: string[]; missed?: string[] }) ?? {};
+  const falseFindings = (s.checks.find((c) => c.name === "qa.no_false_findings")?.observed as string[]) ?? [];
+  const pages = ((s.checks.find((c) => c.name === "qa.pages_covered")?.expected as string[]) ?? []).length;
+  const list = (xs: { from: string; href: string }[]) => xs.map((b) => `${b.href} (linked from ${b.from})`).join(", ");
+  let outcome: TaskOutcome;
+  let message: string;
+  if (s.outcomeClass === "verified_success") {
+    outcome = "VERIFIED_PASS";
+    message = truth.length
+      ? `Audit done, and verified against the site's real state: I checked ${pages} pages and found ${truth.length} broken link${truth.length === 1 ? "" : "s"}: ${list(truth)}. The browser opened each one and got "Page not found".`
+      : `Audit done, and verified against the site's real state: I checked ${pages} pages and found no broken links.`;
+  } else if (s.outcomeClass === "verified_fail") {
+    outcome = "VERIFIED_FAIL";
+    const parts = [];
+    if (obs.missed?.length) parts.push(`it missed ${obs.missed.join(", ")}`);
+    if (falseFindings.length) parts.push(`it reported ${falseFindings.join(", ")}, which ${falseFindings.length === 1 ? "isn't" : "aren't"} broken`);
+    const notCovered = (s.checks.find((c) => c.name === "qa.pages_covered")?.observed as { missing?: string[] })?.missing ?? [];
+    if (notCovered.length) parts.push(`it never opened ${notCovered.join(", ")}`);
+    message = `The audit ran, but it didn't hold up against the site's real state: ${parts.join("; ") || "a check failed"}.`;
+  } else return null;
+  return {
+    outcome, message, audit: { pagesChecked: pages, broken: truth, reported: obs.reported ?? [], missed: obs.missed ?? [], falseFindings },
+    facts: { sku: null, quantity: null, coupon: null, totalCents: null, expectedTotalCents: null, ordersPlaced: s.observed?.orders ?? null, checkoutReached: s.observed?.checkoutReached ?? null },
+    planner: plannerLabel(s.model?.provider, s.model?.requested),
+    evidence: { integrity: s.evidence.integrity_status, manifestSha256: s.evidence.manifestSha256, summaryPath: `/api/runs/${s.runId}/summary`, filesPath: `/api/runs/${s.runId}/evidence/` },
+  };
+}
+
 export function resultFromSummary(s: RunSummary): TaskResult {
+  const audit = auditResult(s);
+  if (audit) return audit;
   const cart = s.checks.find((c) => c.name === "server.cart_item")?.observed as { sku?: string; quantity?: number } | null | undefined;
   const facts: TaskResult["facts"] = {
     sku: cart?.sku ?? null, quantity: cart?.quantity ?? null, coupon: s.observed?.coupon ?? null, totalCents: s.observed?.totals?.totalCents ?? null,

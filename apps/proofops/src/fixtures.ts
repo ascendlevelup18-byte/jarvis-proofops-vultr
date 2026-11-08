@@ -1,6 +1,7 @@
 // Synthetic commerce fixtures and the frozen test specification.
 // The coupon rule lives here, outside page content and model output. All money is integer cents.
 import { createHash } from "node:crypto";
+import type { QaGoal } from "./site-qa.ts";
 
 export type FixtureMode = "normal" | "wrong-total" | "hostile" | "broken" | "hang" | "probe" | "mutating" | "click-swap";
 export const FIXTURE_MODES: readonly FixtureMode[] = ["normal", "wrong-total", "hostile", "broken", "hang", "probe", "mutating", "click-swap"];
@@ -56,6 +57,8 @@ export interface FrozenSpec {
   /** DOM selectors the verifier reads after the run; fixed before the model sees anything. */
   selectors: { subtotal: string; discount: string; total: string; checkoutMarker: string };
   goal?: TaskGoal;
+  /** A website-QA goal. When present, the run is a read-only audit and the store checks don't apply. */
+  qa?: QaGoal;
   specSha256: string;
 }
 
@@ -64,7 +67,7 @@ export const DEFAULT_TASK =
   "and reach the checkout page without placing an order.";
 
 /** Builds the assertion spec and seals it with a hash before any model call. */
-export function freezeSpec(mode: FixtureMode, task = DEFAULT_TASK, ordersExpected = 0, goal?: TaskGoal): Readonly<FrozenSpec> {
+export function freezeSpec(mode: FixtureMode, task = DEFAULT_TASK, ordersExpected = 0, goal?: TaskGoal, qa?: QaGoal): Readonly<FrozenSpec> {
   const rule = goal ? expectedTotals(goal.sku, goal.quantity, goal.coupon) : null;
   const body = {
     fixtureVersion: FIXTURE_VERSION,
@@ -75,10 +78,11 @@ export function freezeSpec(mode: FixtureMode, task = DEFAULT_TASK, ordersExpecte
     quantity: goal?.quantity ?? 1,
     coupon: goal ? goal.coupon : "SAVE10",
     expected: rule ? { ...rule, totalCents: goal!.expectedTotalCents ?? rule.totalCents } : expectedTotals("DEMO-001", 1, "SAVE10"),
-    requireCheckoutReached: goal ? goal.reachCheckout : true,
+    requireCheckoutReached: qa ? false : goal ? goal.reachCheckout : true,
     ordersExpected,
     selectors: { subtotal: "#cart-subtotal", discount: "#cart-discount", total: "#cart-total", checkoutMarker: ordersExpected > 0 ? "#order-placed" : "#checkout-page" },
     ...(goal ? { goal } : {}),
+    ...(qa ? { qa } : {}),
   };
   const specSha256 = createHash("sha256").update(JSON.stringify(body)).digest("hex");
   return Object.freeze({ ...body, specSha256 });

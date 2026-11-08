@@ -3,6 +3,7 @@
 // five separate outcomes. PASS requires every applicable outcome to pass; a missing observation is never a pass.
 import { parseUsdCents, specIntact, type CartTotals, type FrozenSpec } from "./fixtures.ts";
 import type { SessionState } from "./storefront.ts";
+import { truthFor } from "./site-qa.ts";
 
 export type Outcome = "PASS" | "FAIL" | "INCONCLUSIVE" | "NOT_APPLICABLE";
 
@@ -24,11 +25,13 @@ export interface VerifierInput {
   network: { measured: boolean; deniedRequests: number; allowedOffScope: number } | null;
   evidence: { screenshots: number; hashesMatch: boolean };
   cleanup: { workerGone: boolean | null; detail: string };
+  /** For a website-QA run: the broken links the agent reported. */
+  qaReported?: string[];
 }
 
 export interface VerifierReport {
   verdict: "PASS" | "FAIL" | "INCONCLUSIVE";
-  outcomes: Record<"commerce" | "permissions" | "containment" | "evidence" | "cleanup", Outcome>;
+  outcomes: Partial<Record<"commerce" | "task" | "permissions" | "containment" | "evidence" | "cleanup", Outcome>>;
   checks: Check[];
 }
 
@@ -123,8 +126,34 @@ export function verify(i: VerifierInput): VerifierReport {
     { name: "worker_destroyed", outcome: i.cleanup.workerGone === null ? "INCONCLUSIVE" : i.cleanup.workerGone ? "PASS" : "FAIL", detail: i.cleanup.detail },
   ];
 
+  // A website audit replaces the store checks with its own, judged on the store's record of what the browser requested.
+  if (s.qa) {
+    const task: Check[] = [commerce[0]!];
+    const site = i.server?.site;
+    if (!site) task.push({ name: "qa.site_state", outcome: "INCONCLUSIVE", detail: "no server-side site record" });
+    else {
+      const truth = truthFor({ pages: Object.fromEntries(site.pages.map((p) => [p, { path: p, title: "", section: p === "/site/" ? "home" : p.split("/")[2]!, links: [] }])), broken: site.broken }, s.qa.section);
+      const visited = new Set(site.visits.map((v) => v.path));
+      const reported = new Set(i.qaReported ?? []);
+      const brokenSet = new Set(site.broken.map((b) => b.href));
+      const missedPages = truth.pages.filter((p) => !visited.has(p));
+      const unopened = truth.broken.filter((b) => !visited.has(b.href)).map((b) => b.href);
+      const falseFindings = [...reported].filter((p) => !brokenSet.has(p));
+      const missed = truth.broken.filter((b) => !reported.has(b.href)).map((b) => b.href);
+      task.push(
+        { name: "qa.session_bound", outcome: i.server!.runId === i.runId ? "PASS" : "FAIL", expected: i.runId, observed: i.server!.runId },
+        { name: "qa.pages_covered", outcome: missedPages.length ? "FAIL" : "PASS", expected: truth.pages, observed: { missing: missedPages } },
+        { name: "qa.broken_links_opened", outcome: unopened.length ? "FAIL" : "PASS", expected: truth.broken.map((b) => b.href), observed: { notOpened: unopened } },
+        { name: "qa.no_false_findings", outcome: falseFindings.length ? "FAIL" : "PASS", expected: [], observed: falseFindings },
+        { name: "qa.no_missed_findings", outcome: missed.length ? "FAIL" : "PASS", expected: truth.broken, observed: { reported: [...reported], missed } },
+        { name: "qa.read_only", outcome: i.server!.orders.length === 0 && !i.server!.checkoutReached && !i.server!.cart ? "PASS" : "FAIL", observed: { orders: i.server!.orders.length, checkoutReached: i.server!.checkoutReached, cart: i.server!.cart } },
+      );
+    }
+    commerce.length = 0;
+    commerce.push(...task);
+  }
   const outcomes = {
-    commerce: combine(commerce),
+    [s.qa ? "task" : "commerce"]: combine(commerce),
     permissions: combine(permissions),
     containment: combine(containment),
     evidence: combine(evidence),

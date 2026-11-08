@@ -46,7 +46,7 @@ export function classifyOutcome(i: OutcomeInput): OutcomeClass {
     // A person's task has no designed result: it either matched or it didn't, with the safety checks holding.
     if (i.verdict === "PASS") return "verified_success";
     const failing = Object.entries(i.outcomes ?? {}).filter(([, v]) => v === "FAIL").map(([k]) => k);
-    if (i.verdict === "FAIL" && safe && failing.length === 1 && failing[0] === "commerce") return "verified_fail";
+    if (i.verdict === "FAIL" && safe && failing.length === 1 && (failing[0] === "commerce" || failing[0] === "task")) return "verified_fail";
     if (i.verdict === "FAIL") return "unexpected_failure";
     return "incomplete_evidence";
   }
@@ -186,7 +186,7 @@ export function readRunSummary(opts: { runId: string; dir: string | null; anchor
   const verdict: string | null = manifest?.verdict ?? registry?.verdict ?? null;
   const outcomes: Record<string, string> | null = manifest?.outcomes ?? assertions?.outcomes ?? null;
   const mode: string | null = manifest?.mode ?? spec?.mode ?? registry?.mode ?? null;
-  const liveTask = spec?.goal && typeof spec.goal === "object";
+  const liveTask = (spec?.goal && typeof spec.goal === "object") || (spec?.qa && typeof spec.qa === "object");
   const scenario = liveTask ? undefined : mode ? findScenarioForRun(mode, typeof spec?.ordersExpected === "number" ? spec.ordersExpected : null) : undefined;
   const taskExpected: Scenario["expected"] = { status: "completed", verdict: "OPEN" };
 
@@ -248,7 +248,7 @@ export function readRunSummary(opts: { runId: string; dir: string | null; anchor
     runId, source,
     mission: liveTask ? { id: "live-task", title: "Live task", purpose: clip(spec?.task, 300) ?? "", expected: taskExpected }
       : scenario ? { id: scenario.id, title: scenario.title, purpose: scenario.purpose, expected: scenario.expected } : null,
-    task: clip(spec?.task, 500), userText: liveTask ? clip(spec?.goal?.userText, 500) : null, status, verdict, outcomeClass, missionOutcome: missionOutcomeOf(outcomeClass),
+    task: clip(spec?.task, 500), userText: liveTask ? clip(spec?.goal?.userText ?? spec?.qa?.userText, 500) : null, status, verdict, outcomeClass, missionOutcome: missionOutcomeOf(outcomeClass),
     error: clip(manifest?.error ?? registry?.error, 300),
     tier: clip(manifest?.tier ?? registry?.tier, 40), codeSha: clip(manifest?.codeSha, 64), deployment: clip(manifest?.deployment, 80), mode,
     startedAt: started ?? registry?.createdAt ?? null, finishedAt: finished ?? registry?.updatedAt ?? null, durationMs, outcomes,

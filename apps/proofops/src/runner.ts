@@ -8,6 +8,7 @@ import { join } from "node:path";
 import type { AddressInfo } from "node:net";
 import type { Server } from "node:http";
 import { freezeSpec, type FixtureMode, type FrozenSpec, type TaskGoal } from "./fixtures.ts";
+import { navigableFor, reportedBroken, type QaGoal } from "./site-qa.ts";
 import { createGateway, type GatewayEvent } from "./gateway.ts";
 import { checkAction, type Observation, type PolicyDecision, type RunScope } from "./policy.ts";
 import { launchWorker, type SandboxLimits, type WorkerHandle } from "./worker-client.ts";
@@ -34,6 +35,8 @@ export interface RunConfig {
   ordersExpected?: number;
   /** A validated Live Task. The planner only ever sees cfg.task, generated from this. */
   goal?: TaskGoal;
+  /** A validated website-QA goal: a read-only audit of the run's own staging site. */
+  qa?: QaGoal;
   /** Operator approval for consequential steps. Returns a signed one-time token, or null when refused or timed out. */
   approval?: (req: ApprovalRequest) => Promise<string | null>;
   /** Test hook: receives the worker handle right after launch. */
@@ -99,12 +102,15 @@ async function listen(server: Server, where: { port: number; host: string } | { 
 
 /** Per-run budgets when a caller sets none. Exported so the UI can show the real numbers. */
 export const RUN_LIMITS = { maxSteps: 12, maxModelCalls: 14, maxTotalTokens: 60_000 } as const;
+/** A site audit visits more pages, so it gets more steps. The token budget is unchanged. */
+export const QA_LIMITS = { maxSteps: 30, maxModelCalls: 32, maxTotalTokens: 60_000 } as const;
 
 export async function runScenario(cfg: RunConfig): Promise<RunResult> {
   const runId = cfg.runId ?? newRunId();
-  const maxSteps = cfg.maxSteps ?? RUN_LIMITS.maxSteps;
+  const limits = cfg.qa ? QA_LIMITS : RUN_LIMITS;
+  const maxSteps = cfg.maxSteps ?? limits.maxSteps;
   const deadline = Date.now() + (cfg.wallClockMs ?? 120_000);
-  const maxModelCalls = cfg.maxModelCalls ?? RUN_LIMITS.maxModelCalls;
+  const maxModelCalls = cfg.maxModelCalls ?? limits.maxModelCalls;
   const maxTotalTokens = cfg.maxTotalTokens ?? RUN_LIMITS.maxTotalTokens;
   const dir = join(cfg.evidenceRoot, runId);
   // A run id is used once: never overwrite an earlier run's evidence.
@@ -132,17 +138,18 @@ export async function runScenario(cfg: RunConfig): Promise<RunResult> {
   };
 
   // 1. Freeze the assertions before anything else happens.
-  const spec: FrozenSpec = freezeSpec(cfg.mode, cfg.task, cfg.ordersExpected ?? 0, cfg.goal);
+  const spec: FrozenSpec = freezeSpec(cfg.mode, cfg.task, cfg.ordersExpected ?? 0, cfg.goal, cfg.qa);
   await put("spec.json", JSON.stringify(spec, null, 2));
   ev("spec.frozen", { specSha256: spec.specSha256 });
 
   // 2. A fresh storefront session for this run.
-  const sres = await fetch(`${cfg.storefront.trustedBase}/sessions`, { method: "POST", body: JSON.stringify({ runId, mode: cfg.mode, quantityField: cfg.goal !== undefined }) });
+  const sres = await fetch(`${cfg.storefront.trustedBase}/sessions`, { method: "POST", body: JSON.stringify({ runId, mode: cfg.mode, quantityField: cfg.goal !== undefined, site: cfg.qa !== undefined }) });
   const { sid, basePath } = (await sres.json()) as { sid: string; basePath: string };
   const scope: RunScope = {
     base: `http://${STORE_HOST}${basePath}`,
-    navigablePaths: ["/", "/cart", "/checkout"],
-    fillableInputs: cfg.goal && cfg.goal.quantity > 1 ? ["code", "quantity"] : ["code"],
+    // A site audit may only navigate to its start pages; everything else must be reached by clicking real links.
+    navigablePaths: cfg.qa ? navigableFor(cfg.qa) : ["/", "/cart", "/checkout"],
+    fillableInputs: cfg.qa ? [] : cfg.goal && cfg.goal.quantity > 1 ? ["code", "quantity"] : ["code"],
     consequentialPaths: ["/checkout/submit"],
     maxSteps,
   };
@@ -223,7 +230,7 @@ export async function runScenario(cfg: RunConfig): Promise<RunResult> {
     stopTimer = setTimeout(() => hardStop("timed_out"), Math.max(0, deadline - Date.now()));
     if (cfg.signal?.aborted) hardStop("cancelled");
     cfg.signal?.addEventListener("abort", () => hardStop("cancelled"), { once: true });
-    const started = await worker.call<Record<string, unknown>>("start", { startUrl: scope.base }, 45_000);
+    const started = await worker.call<Record<string, unknown>>("start", { startUrl: cfg.qa ? new URL(navigableFor(cfg.qa).at(-1)!.slice(1), scope.base).toString() : scope.base }, 45_000);
     ev("worker.started", started);
 
     let consecutiveInvalid = 0;
@@ -333,7 +340,11 @@ export async function runScenario(cfg: RunConfig): Promise<RunResult> {
 
     // 4. Verification reads by the control plane (not the model): final page, then the cart.
     if (stopReason) throw new Error(stopReason === "timed_out" ? "wall clock limit reached" : "cancelled by operator");
-    try {
+    if (cfg.qa) {
+      // A site audit is judged on the store's own record of what the browser requested, not on a page read.
+      await shot("final");
+      ev("verifier.dom_read", { capability: "site-qa" });
+    } else try {
       const finalRead = await worker.call<{ values: Record<string, string | null> }>("read", { selectors: { marker: spec.selectors.checkoutMarker } });
       await shot("final");
       const cartRead = await worker.call<{ status: number | null }>("navigate", { url: new URL("cart", scope.base).toString() });
@@ -405,6 +416,8 @@ export async function runScenario(cfg: RunConfig): Promise<RunResult> {
     network: { measured: true, deniedRequests: gatewayEvents.filter((g) => g.decision === "deny").length, allowedOffScope },
     evidence: { screenshots: screenshotCount, hashesMatch },
     cleanup,
+    // The agent's report is a claim under test: only its final finish note, parsed for site paths.
+    qaReported: cfg.qa ? reportedBroken((steps.filter((s) => s.policy.decision === "allow" && (s.proposal as { tool?: string })?.tool === "finish").at(-1)?.proposal as { note?: string } | undefined)?.note) : undefined,
   });
   if (status !== "completed" && report.verdict === "PASS") report.verdict = "INCONCLUSIVE"; // a broken run never reports PASS
   await put("assertions.json", JSON.stringify(report, null, 2));

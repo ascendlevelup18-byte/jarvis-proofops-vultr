@@ -9,17 +9,18 @@ export interface Answer { kind: "answer"; topic: string; message: string; exampl
 const PRODUCT = CATALOG["DEMO-001"];
 const CODES = Object.entries(COUPONS).map(([code, c]) => `${code} takes ${formatUsd(c.offCents)} off`).join(", ");
 const EXAMPLES = [
+  "Audit the staging site for broken links.",
   "Add 2 ProofOps Field Jackets to the cart, apply SAVE10, and confirm the total is $190 without placing an order.",
   "Using the faulty store, add one jacket, apply SAVE10, go to checkout, and check the total is $90 without placing an order.",
   "Buy one jacket with code SAVE10. Place the order after I approve it.",
 ];
-const CAN_DO = `I work in a synthetic demo store. I can add the ${PRODUCT.name} to the cart, apply or skip a discount code, check a total you give me, go to checkout, or place a synthetic order after you approve the exact cart. A live model drives a sandboxed browser, and an independent check of the store's records decides whether the task really succeeded. No real payments are made.`;
+const CAN_DO = `I work in a synthetic demo store. I can add the ${PRODUCT.name} to the cart, apply or skip a discount code, check a total you give me, go to checkout, or place a synthetic order after you approve the exact cart. I can also audit a built-in staging website for broken links. A live model drives a sandboxed browser, and an independent check of the store's records decides whether the task really succeeded. No real payments are made.`;
 
 const answer = (topic: string, message: string): Answer => ({ kind: "answer", topic, message, examples: EXAMPLES });
 
 // A request to do something starts with an action, possibly after a polite opener.
 const OPENER = String.raw`^(?:(?:ok(?:ay)?|hi|hey|jarvis|please)[,!.]?\s+)*(?:(?:can|could|would|will) you\s+(?:please\s+)?|please\s+|i(?:'d| would) like (?:you )?to\s+|i want (?:you )?to\s+|i need (?:you )?to\s+|let'?s\s+)?`;
-const ACTION = String.raw`(?:add|buy|purchase|order|apply|put|place|check ?out|go to (?:the )?(?:cart|checkout)|reach|proceed|verify|confirm|check (?:that|the|if|whether)|use (?:code|the code|coupon|save\d+)|using the|on the (?:faulty|hostile|hung|broken)|try the|get me|add)`;
+const ACTION = String.raw`(?:audit|inspect|crawl|scan|qa|add|buy|purchase|order|apply|put|place|check ?out|go to (?:the )?(?:cart|checkout)|reach|proceed|verify|confirm|check (?:that|the|if|whether)|use (?:code|the code|coupon|save\d+)|using the|on the (?:faulty|hostile|hung|broken)|try the|get me|add)`;
 const TASK_START = new RegExp(`${OPENER}${ACTION}\\b`, "i");
 const QUESTION_START = /^(?:what|what's|whats|which|who|why|how|when|where|is|are|do|does|did|was|were|should|tell me|show me|list|explain|describe)\b/i;
 

@@ -14,6 +14,7 @@ import { startSigner } from "./signer.ts";
 import { goalStubPlanner, stubPlanner, vultrPlanner, type Planner } from "./model.ts";
 import { interpretTask } from "./tasks.ts";
 import { converse } from "./conversation.ts";
+import { interpretQa, qaStubPlanner, type QaGoal } from "./site-qa.ts";
 import { InferenceBudget } from "./inference-budget.ts";
 import { plannerLabel, resultFromSummary, statusFromEvent, statusFromStep, type TaskPhase, type TaskResult, type TaskStatus } from "./task-view.ts";
 import { CATALOG, formatUsd, type Sku, type TaskGoal } from "./fixtures.ts";
@@ -114,7 +115,7 @@ const budget = process.env.PROOFOPS_BUDGET_USD ? new InferenceBudget({
 }) : null;
 if (PLANNER === "vultr" && process.env.PROOFOPS_REQUIRE_BUDGET === "1" && !budget) die("PROOFOPS_REQUIRE_BUDGET=1 but no budget is configured");
 // A task goal changes which scripted walk the stub takes. It never changes which provider runs, and there's no fallback.
-const makePlanner = (goal?: TaskGoal): Planner => (PLANNER === "vultr" ? vultrPlanner({ apiKey: inferenceKey, model: MODEL!, budget: budget ?? undefined }) : goal ? goalStubPlanner(goal) : stubPlanner());
+const makePlanner = (goal?: TaskGoal, qa?: QaGoal): Planner => (PLANNER === "vultr" ? vultrPlanner({ apiKey: inferenceKey, model: MODEL!, budget: budget ?? undefined }) : qa ? qaStubPlanner(qa) : goal ? goalStubPlanner(goal) : stubPlanner());
 const TIER: Tier = SANDBOX ? (PLANNER === "vultr" ? "VULTR_GVISOR_LIVE_MODEL" : "VULTR_GVISOR_SCRIPTED") : PLANNER === "vultr" ? "LOCAL_LIVE_MODEL" : "LOCAL_MODEL_STUB";
 
 // ---- Live run state (one mission at a time keeps the demo VM predictable) ----
@@ -176,7 +177,7 @@ function snapshot(l: Live) {
   };
 }
 
-async function startRun(scenario: Scenario, idempotencyKey: string | null, goal?: TaskGoal, chat?: { understood: string[]; userText: string }): Promise<{ runId: string; created: boolean; runToken?: string }> {
+async function startRun(scenario: Scenario, idempotencyKey: string | null, goal?: TaskGoal, chat?: { understood: string[]; userText: string }, qa?: QaGoal): Promise<{ runId: string; created: boolean; runToken?: string }> {
   const runId = `run_${new Date().toISOString().replace(/[-:.TZ]/g, "").slice(0, 14)}_${randomBytes(8).toString("hex")}`;
   const reg = registry.create({ id: runId, idempotencyKey, mode: scenario.mode, tier: TIER });
   if (!reg.created) return { runId: reg.run.id, created: false };
@@ -186,7 +187,7 @@ async function startRun(scenario: Scenario, idempotencyKey: string | null, goal?
   active = live;
   const cfg: RunConfig = {
     runId, mode: scenario.mode, task: scenario.task, ordersExpected: scenario.ordersExpected,
-    planner: makePlanner(goal), tier: TIER, storefront, goal,
+    planner: makePlanner(goal, qa), tier: TIER, storefront, goal, qa,
     worker: SANDBOX
       ? { kind: "sandbox", socketRoot: "/run/proofops", limits: { image: IMAGE, runtime: "runsc", memoryMb: 1024, cpus: 1, pids: 256, chromiumNoSandbox: NO_CHROMIUM_SANDBOX } }
       : { kind: "local" },
@@ -415,6 +416,21 @@ const server = createServer(async (req, res) => {
       // Talk gets an answer from the store's own facts. No run, no browser, no model call.
       const talk = converse(body.text);
       if (talk) return talk.topic === "refused" ? json(res, 422, { ...talk, error: "unsupported_task" }) : json(res, 200, talk);
+      // A website audit is its own capability with its own checks, on the same run path.
+      const audit = interpretQa(body.text);
+      if (audit && !audit.ok) return json(res, 422, { kind: "answer", topic: "clarify", error: "needs_clarification", message: audit.message });
+      if (audit && audit.ok) {
+        if (active) return json(res, 409, { error: "busy" });
+        if (rateLimited(req)) return json(res, 429, { error: "rate_limited" });
+        if (registry.countSince(new Date(Date.now() - 86_400_000).toISOString()) >= MAX_RUNS_PER_DAY) return json(res, 429, { error: "daily_limit" });
+        const given = typeof req.headers["idempotency-key"] === "string" ? req.headers["idempotency-key"].slice(0, 100) : null;
+        const key = given ? `task:${createHash("sha256").update(audit.goal.userText).digest("hex").slice(0, 16)}:${given}` : null;
+        const scenario: Scenario = { id: "live-task", title: "Website QA", purpose: audit.plannerTask, mode: "normal", task: audit.plannerTask, ordersExpected: 0,
+          approvals: "none", wallClockMs: 240_000, forcedMalicious: false, expected: { status: "completed", verdict: "OPEN" } };
+        const started = await startRun(scenario, key, undefined, { understood: audit.understood, userText: audit.goal.userText }, audit.goal);
+        return json(res, 202, { ...started, understood: audit.understood, plannerTask: audit.plannerTask, userText: audit.goal.userText,
+          planner: plannerLabel(PLANNER === "vultr" ? "vultr-serverless-inference" : "local-model-stub", MODEL) }, started.runToken ? { "set-cookie": runCookies(started.runId, started.runToken) } : {});
+      }
       const task = interpretTask(body.text);
       if (!task.ok) return json(res, 422, { kind: "answer", topic: task.kind, error: task.kind === "clarify" ? "needs_clarification" : "unsupported_task", message: task.message });
       if (active) return json(res, 409, { error: "busy" });
