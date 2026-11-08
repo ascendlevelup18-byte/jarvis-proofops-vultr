@@ -17,9 +17,9 @@ Give JARVIS a task. A live Vultr model operates a real browser inside a gVisor s
 ## Versions
 | | |
 |---|---|
-| Production | `224dd24`, deployed to https://45-63-82-115.sslip.io on 8 Nov 2026. [`/api/health`](https://45-63-82-115.sslip.io/api/health) reports the exact running commit |
-| `main` | `224dd24` plus documentation-only commits, which don't change the running app |
-| Previous releases | `8ce8057`, `f618630`, `1c514ce`, `6cc0cdc`, `88bb4a6`, `1d25050`, `76fee8b`, `64e6714`, and the original `d14d24c` (tag [`release-20261104`](ops/RECOVERY.md#rollback)) |
+| Production | `83042c3`, deployed to https://45-63-82-115.sslip.io on 8 Nov 2026. [`/api/health`](https://45-63-82-115.sslip.io/api/health) reports the exact running commit |
+| `main` | `83042c3` plus documentation-only commits, which don't change the running app |
+| Previous releases | `224dd24`, `8ce8057`, `f618630`, `1c514ce`, `6cc0cdc`, `88bb4a6`, `1d25050`, `76fee8b`, `64e6714`, and the original `d14d24c` (tag [`release-20261104`](ops/RECOVERY.md#rollback)) |
 | Planner in production | `deepseek-v4.1-flash-1017` on Vultr Serverless Inference, under a hard spend ceiling checked before every call |
 
 ## Try it

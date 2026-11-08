@@ -31,3 +31,6 @@ JARVIS can't do live research. A safe version needs an approved data source and 
 
 ## Final UX text pass (224dd24)
 The home screen, examples, footer and status wording no longer lead with the demo store. Text only, gated 182/182 and deployed. Before and after: `ux-before-home.jpg`, `ux-after-home.jpg`, `ux-after-security-answer.jpg`.
+
+## Palette and progress stepper (83042c3)
+A new dark palette and a four-step progress indicator (Understanding, Executing, Verifying, Result) driven only by real run states, ending in the real verdict. Frontend only; gated 182/182 and deployed. Screenshots: `ui2-*.jpg`. Not built: sidebar, evidence side panel, restyled approval layout beyond its buttons.
