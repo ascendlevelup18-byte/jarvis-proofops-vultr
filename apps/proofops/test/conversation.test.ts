@@ -8,7 +8,7 @@ const talk = (t: string, topic?: string) => { const a = converse(t); assert.ok(a
 const task = (t: string) => { assert.equal(converse(t), null, `expected a task for: ${t}`); };
 
 test("greetings and help are answered, not run", () => {
-  assert.match(talk("Hello", "greeting"), /^Hello\. I work in a synthetic demo store/);
+  assert.match(talk("Hello", "greeting"), /^Hello\. I'm a bounded execution agent\. I can audit a built-in staging website/);
   talk("hi there", "greeting");
   assert.match(talk("What can you do?", "capabilities"), /independent check of the store's records/);
   talk("Can you help me?", "capabilities");
