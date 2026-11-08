@@ -223,3 +223,16 @@ test("CH-11 one task at a time: a second task gets busy, and nothing is queued",
   await fetch(`${base}/api/runs/${t.runId}/cancel`, { method: "POST", headers: { ...H, ...owner(t.runToken) }, body: "{}" });
   await follow(t.runId, t.runToken);
 });
+
+test("CH-12 refused text is never stored, and accepted text can only hold store words", async () => {
+  const { readdirSync, readFileSync, statSync } = await import("node:fs");
+  for (const text of ["Add a jacket for maria.garcia@example.org", "Add a jacket, my phone is 555 0100 and I live at 12 Oak Street"]) {
+    const r = await submit(text);
+    assert.equal(r.status, 422, text);
+  }
+  const walk = (d: string): string[] => readdirSync(d).flatMap((n) => { const p = join(d, n); return statSync(p).isDirectory() ? walk(p) : [p]; });
+  for (const file of walk(work)) {
+    const body = readFileSync(file).toString("latin1");
+    for (const marker of ["maria.garcia", "Oak Street", "555 0100"]) assert.equal(body.includes(marker), false, `${marker} in ${file}`);
+  }
+});

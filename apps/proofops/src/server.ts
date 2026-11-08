@@ -240,8 +240,8 @@ const SECURITY_HEADERS = {
   "x-content-type-options": "nosniff", "referrer-policy": "no-referrer", "x-frame-options": "DENY",
   "content-security-policy": "default-src 'self'; img-src 'self' data:; style-src 'self'; script-src 'self'; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'",
 };
-const json = (res: ServerResponse, status: number, body: unknown) => {
-  res.writeHead(status, { "content-type": "application/json", "cache-control": "no-store", ...SECURITY_HEADERS });
+const json = (res: ServerResponse, status: number, body: unknown, extra: Record<string, string | string[]> = {}) => {
+  res.writeHead(status, { "content-type": "application/json", "cache-control": "no-store", ...SECURITY_HEADERS, ...extra });
   res.end(JSON.stringify(body));
 };
 async function readJson(req: IncomingMessage): Promise<Record<string, unknown>> {
@@ -300,6 +300,21 @@ function summaryOf(id: string): RunSummary | null {
 }
 const runIsLive = (id: string) => active?.runId === id;
 
+// The browser that started a run also gets its token as a cookie scoped to that run's paths, so the page's own
+// screenshots and event stream load without putting the token in a URL. The cookie only reads: approving, rejecting
+// and cancelling still need the token in a header, which a cross-site request can't send.
+const RUN_COOKIE_SECONDS = 3_600;
+const runCookies = (runId: string, token: string): string[] => ["runs", "tasks"].map((kind) =>
+  `proofops_run=${token}; Path=/api/${kind}/${runId}; Max-Age=${RUN_COOKIE_SECONDS}; HttpOnly; SameSite=Strict${TRUST_PROXY || SANDBOX ? "; Secure" : ""}`);
+const cookieOk = (req: IncomingMessage, live: Live | undefined | null) => {
+  const want = Buffer.from(live?.ownerToken ?? "");
+  if (!want.length) return false;
+  for (const m of String(req.headers.cookie ?? "").matchAll(/(?:^|;\s*)proofops_run=([0-9a-f]{48})(?=;|$)/g)) {
+    const given = Buffer.from(m[1]!);
+    if (given.length === want.length && timingSafeEqual(given, want)) return true;
+  }
+  return false;
+};
 const ownerOk = (req: IncomingMessage, live: Live | undefined | null) => {
   const given = Buffer.from(String(req.headers["x-run-token"] ?? ""));
   const want = Buffer.from(live?.ownerToken ?? "");
@@ -307,7 +322,7 @@ const ownerOk = (req: IncomingMessage, live: Live | undefined | null) => {
 };
 
 /** Run details hold task text and execution traces. There are no accounts, so only the run's owner or a local operator reads them. */
-const detailsAllowed = (req: IncomingMessage, live: Live | undefined | null) => historyAllowed(req) || ownerOk(req, live);
+const detailsAllowed = (req: IncomingMessage, live: Live | undefined | null) => historyAllowed(req) || ownerOk(req, live) || cookieOk(req, live);
 
 const server = createServer(async (req, res) => {
   try {
@@ -367,7 +382,8 @@ const server = createServer(async (req, res) => {
       // Global budget (also caps model spend: at most 14 calls and 60k tokens per run).
       if (registry.countSince(new Date(Date.now() - 86_400_000).toISOString()) >= MAX_RUNS_PER_DAY) return json(res, 429, { error: "daily_limit" });
       const key = typeof req.headers["idempotency-key"] === "string" ? req.headers["idempotency-key"].slice(0, 128) : null;
-      return json(res, 202, await startRun(scenario, key));
+      const started = await startRun(scenario, key);
+      return json(res, 202, started, started.runToken ? { "set-cookie": runCookies(started.runId, started.runToken) } : {});
     }
     // Live Tasks: validate the person's text into a goal, then use the same run path as every mission.
     if (req.method === "POST" && p === "/api/tasks") {
@@ -384,7 +400,7 @@ const server = createServer(async (req, res) => {
         approvals: task.goal.placeOrder ? "operator" : "none", wallClockMs: task.wallClockMs, forcedMalicious: false, expected: { status: "completed", verdict: "OPEN" } };
       const started = await startRun(scenario, key, task.goal, { understood: task.understood, userText: task.goal.userText });
       return json(res, 202, { ...started, understood: task.understood, plannerTask: task.plannerTask, userText: task.goal.userText,
-        planner: plannerLabel(PLANNER === "vultr" ? "vultr-serverless-inference" : "local-model-stub", MODEL) });
+        planner: plannerLabel(PLANNER === "vultr" ? "vultr-serverless-inference" : "local-model-stub", MODEL) }, started.runToken ? { "set-cookie": runCookies(started.runId, started.runToken) } : {});
     }
     // Chat view of a task: concise statuses and a final result. Traces stay on the restricted run routes below.
     const tv = /^\/api\/tasks\/(run_[0-9]{14}_[0-9a-f]{8,16})(\/events)?$/.exec(p);

@@ -4,7 +4,8 @@ For the chat frontend. Base is the same origin as the ProofOps server, because i
 
 ## Rules for the client
 - Every POST sends `content-type: application/json` and `x-proofops: 1`.
-- `runToken` comes back only from the first `POST /api/tasks`. Keep it in `sessionStorage`, never in a URL. It's the only capability to read, approve, reject or cancel that run on a non-local server.
+- `runToken` comes back only from the first `POST /api/tasks`. Keep it in `sessionStorage`, never in a URL. It's the only capability to approve, reject or cancel that run.
+- The same response sets an `HttpOnly`, `SameSite=Strict` cookie `proofops_run`, scoped to `/api/runs/{id}` and `/api/tasks/{id}`, for one hour (`Secure` when deployed). It lets that browser read its own run (stream, summary, screenshots) without a header. It never approves, rejects or cancels.
 - Render all text with `textContent`. `userText` is untrusted, and the CSP blocks inline script.
 - One task runs at a time. Nothing is queued.
 - Only `result.outcome` may be shown as success. A status is never a result.
@@ -76,7 +77,7 @@ Approval needs a real button on the exact cart shown. Never treat a typed "yes" 
 ## 5. Advanced views only
 Not for normal chat. These need `x-run-token`, or a direct local request to a local development server, or an operator's `PROOFOPS_OPEN_HISTORY=1`. Otherwise 403.
 
-`GET /api/runs/{id}` (raw trace), `/stream`, `/summary`, `/verify-evidence`, `/evidence/{file}`. `GET /api/history` and `GET /api/compare` have no token path. Evidence images load with a plain `<img>` only on a local server. Elsewhere the header requires `fetch`, and the CSP doesn't yet allow `blob:` images.
+`GET /api/runs/{id}` (raw trace), `/stream`, `/summary`, `/verify-evidence`, `/evidence/{file}`. `GET /api/history` and `GET /api/compare` have no token path. The owner's browser loads its own run's evidence images with a plain `<img>`, through the cookie.
 
 ## 6. Open to anyone
 `GET /api/health`, `/api/trust`, `/api/scenarios`, and `/api/runs` (a hashed ref and outcome per run, no text).
