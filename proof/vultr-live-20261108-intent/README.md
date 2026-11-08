@@ -28,3 +28,6 @@ JARVIS can't do live research. A safe version needs an approved data source and 
 
 ## Judge rehearsal
 [`FINAL-JUDGE-REHEARSAL.md`](FINAL-JUDGE-REHEARSAL.md) records the rehearsal on `8ce8057`, including the three defects it found and fixed, and the rehearsal screenshots `rehearsal-*.jpg`.
+
+## Final UX text pass (224dd24)
+The home screen, examples, footer and status wording no longer lead with the demo store. Text only, gated 182/182 and deployed. Before and after: `ux-before-home.jpg`, `ux-after-home.jpg`, `ux-after-security-answer.jpg`.
