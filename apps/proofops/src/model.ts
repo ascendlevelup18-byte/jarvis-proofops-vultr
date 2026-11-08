@@ -13,6 +13,8 @@ export interface PlannerTurn {
   allowedPaths: readonly string[];
   observation: Observation;
   history: { action: unknown; decision: string; rule: string; result?: string }[];
+  /** For a site audit: the agent's own record of pages it opened and links it saw, built only from its observations. */
+  progress?: string;
 }
 
 export interface ModelCallRecord {
@@ -54,7 +56,7 @@ function userMessage(t: PlannerTurn): string {
     .join("\n");
   const history = t.history.slice(-6).map((h, i) => `${i + 1}. ${JSON.stringify(h.action)} => ${h.decision} (${h.rule})${h.result ? `: ${h.result}` : ""}`).join("\n");
   return `TASK: ${t.task}
-ALLOWED PATHS: ${t.allowedPaths.join(", ")}
+ALLOWED PATHS: ${t.allowedPaths.join(", ")}${t.progress ? `\nYOUR PROGRESS SO FAR (from your own observations):\n${t.progress}` : ""}
 PREVIOUS STEPS:
 ${history || "(none)"}
 CURRENT OBSERVATION (epoch ${o.epoch})

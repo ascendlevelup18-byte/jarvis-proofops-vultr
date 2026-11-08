@@ -8,7 +8,7 @@ import { join } from "node:path";
 import type { AddressInfo } from "node:net";
 import type { Server } from "node:http";
 import { freezeSpec, type FixtureMode, type FrozenSpec, type TaskGoal } from "./fixtures.ts";
-import { navigableFor, reportedBroken, type QaGoal } from "./site-qa.ts";
+import { AuditProgress, navigableFor, reportedBroken, type QaGoal } from "./site-qa.ts";
 import { createGateway, type GatewayEvent } from "./gateway.ts";
 import { checkAction, type Observation, type PolicyDecision, type RunScope } from "./policy.ts";
 import { launchWorker, type SandboxLimits, type WorkerHandle } from "./worker-client.ts";
@@ -235,11 +235,13 @@ export async function runScenario(cfg: RunConfig): Promise<RunResult> {
 
     let consecutiveInvalid = 0;
     let tokensUsed = 0;
+    const progress = cfg.qa ? new AuditProgress() : null;
     for (let step = 0; step < maxSteps; step++) {
       if (stopReason) break;
       if (modelCalls.length >= maxModelCalls) { status = "failed"; error = "model call budget exhausted"; break; }
       const obs = await worker.call<Observation>("observe");
       await put(`observations/step-${String(step).padStart(2, "0")}.json`, JSON.stringify(obs, null, 2));
+      progress?.record(obs);
       // A planner that ignores the signal cannot hold the run open: the stop wins the race.
       const stopped = new Promise<ModelCallRecord>((resolve) => {
         const onStop = () => resolve({ provider: cfg.planner.kind === "vultr" ? "vultr-serverless-inference" : "local-model-stub", requestedModel: cfg.planner.model,
@@ -250,6 +252,7 @@ export async function runScenario(cfg: RunConfig): Promise<RunResult> {
       const call = await Promise.race([cfg.planner.next({
         task: spec.task, allowedPaths: scope.navigablePaths, observation: obs,
         history: steps.map((s) => ({ action: s.proposal, decision: s.policy.decision, rule: s.policy.rule, result: s.result })),
+        ...(progress ? { progress: progress.summary() } : {}),
       }, plannerAbort.signal), stopped]);
       modelCalls.push(call);
       if (stopReason) { ev("model.reply_after_stop_discarded", { step }); break; } // never act on a late reply

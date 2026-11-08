@@ -126,6 +126,28 @@ export function interpretQa(input: unknown): { ok: true; goal: QaGoal; plannerTa
   };
 }
 
+/** The agent's audit memory: pages it opened (with the title it saw) and links it saw but hasn't opened. Built only
+ *  from its own observations, so it can't reveal anything the browser didn't see. */
+export class AuditProgress {
+  #opened = new Map<string, string>();
+  #seen = new Set<string>();
+  static sitePath(u: string | undefined): string | null {
+    if (!u) return null;
+    try { const p = new URL(u).pathname.replace(/^\/s\/[^/]+/, ""); return p === "/site" ? "/site/" : p.startsWith("/site/") ? p : null; } catch { return null; }
+  }
+  record(o: Observation) {
+    const here = AuditProgress.sitePath(o.url);
+    if (!here) return;
+    this.#opened.set(here, /Page not found/i.test(o.title) || /Page not found/.test(o.text) ? "Page not found" : o.title.replace(/ · .*$/, ""));
+    for (const e of o.elements) { const p = AuditProgress.sitePath(e.href); if (p) this.#seen.add(p); }
+  }
+  summary(): string {
+    const opened = [...this.#opened].map(([p, t]) => `${p} (${t})`).join(", ") || "none";
+    const pending = [...this.#seen].filter((p) => !this.#opened.has(p)).join(", ") || "none";
+    return `Opened: ${opened}\nSeen but not opened yet: ${pending}`;
+  }
+}
+
 /** LOCAL MODEL STUB for website QA: a methodical scripted crawl. Never presented as AI. */
 export function qaStubPlanner(goal: QaGoal, inject?: (step: number, o: Observation) => unknown): Planner {
   let step = 0;

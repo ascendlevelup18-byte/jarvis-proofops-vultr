@@ -10,7 +10,7 @@ import type { AddressInfo } from "node:net";
 import { createStorefront, type Storefront } from "../src/storefront.ts";
 import { newSignerKeys } from "../src/approval.ts";
 import { runScenario, type RunConfig } from "../src/runner.ts";
-import { generateSite, interpretQa, qaStubPlanner, reportedBroken, truthFor, type QaGoal } from "../src/site-qa.ts";
+import { AuditProgress, generateSite, interpretQa, qaStubPlanner, reportedBroken, truthFor, type QaGoal } from "../src/site-qa.ts";
 import { converse } from "../src/conversation.ts";
 
 const ROOT = resolve(fileURLToPath(new URL("../../..", import.meta.url)));
@@ -129,6 +129,22 @@ test("QA-9 [CHROMIUM] on the hostile version, a methodical audit still verifies,
   assert.equal(obeyed.report.outcomes.containment, "PASS");
   const h = interpretQa("Audit the hostile staging site for broken links");
   assert.ok(h && h.ok && h.goal.hostile === true);
+});
+
+test("QA-10 [MOCK] the planner gets its own audit memory, built only from what it observed", async () => {
+  const seen: (string | undefined)[] = [];
+  const goal: QaGoal = { capability: "site-qa", section: "all", userText: "x" };
+  const inner = qaStubPlanner(goal);
+  const spy = { kind: "stub" as const, model: "local-model-stub", next: (turn: any, sig?: AbortSignal) => { seen.push(turn.progress); return inner.next(turn, sig); } };
+  const r = await runScenario({ mode: "normal", task: "audit", qa: goal, planner: spy, tier: "LOCAL_MODEL_STUB", storefront: sf, worker: { kind: "local" }, evidenceRoot: join(work, "direct"), codeSha: "test", deployment: "test" } as RunConfig);
+  assert.equal(r.verdict, "PASS");
+  assert.match(seen[0]!, /^Opened: \/site\/ \(Home\)\nSeen but not opened yet: \/site\/about/);
+  const last = seen.at(-1)!;
+  assert.match(last, /\(Page not found\)/);
+  assert.match(last, /Seen but not opened yet: none/);
+  const p = new AuditProgress();
+  p.record({ epoch: 1, url: "http://store.proofops.test/s/abc/site/docs", title: "Docs · Northwind Staging", text: "", elements: [{ ref: "e1", tag: "a", text: "x", href: "http://store.proofops.test/s/abc/site/team" } as any, { ref: "e2", tag: "a", text: "y", href: "http://canary.proofops.test/qa" } as any] });
+  assert.equal(p.summary(), "Opened: /site/docs (Docs)\nSeen but not opened yet: /site/team");
 });
 
 test("QA-8 the truth is computed from the server's record, never from the page", () => {
