@@ -1,0 +1,97 @@
+{
+  "runId": "run_20261108173349_bb2374a6a08b3fe8",
+  "tier": "VULTR_GVISOR_LIVE_MODEL",
+  "codeSha": "fc2a367f51f63cb153260bab8539e40d623602ef",
+  "specSha256": "fe3a3bd3caccfad4bfe6801febd91d5113cfdf3eb40082f26c9b7593c92a2e33",
+  "deployment": "vultr:sjc:45.63.82.115:qa-candidate",
+  "mode": "normal",
+  "model": {
+    "kind": "vultr",
+    "requested": "deepseek-v4.1-flash-1017",
+    "responseModels": [
+      "deepseek-v4.1-flash-1017"
+    ]
+  },
+  "startedAt": "2026-11-08T17:33:49.780Z",
+  "finishedAt": "2026-11-08T17:34:10.929Z",
+  "status": "completed",
+  "error": null,
+  "verdict": "PASS",
+  "outcomes": {
+    "task": "PASS",
+    "permissions": "PASS",
+    "containment": "PASS",
+    "evidence": "PASS",
+    "cleanup": "PASS"
+  },
+  "limits": {
+    "maxSteps": 30,
+    "wallClockMs": 240000,
+    "maxModelCalls": 32,
+    "maxTotalTokens": 60000
+  },
+  "isolation": {
+    "runtime": "runsc",
+    "network": "none + per-run gateway socket",
+    "chromiumSandbox": true,
+    "image": "proofops-worker:1.64.1",
+    "hostObserved": {
+      "runtime": "runsc",
+      "networkMode": "none",
+      "readonlyRootfs": true,
+      "capDrop": [
+        "ALL"
+      ],
+      "privileged": false,
+      "memory": 1073741824,
+      "nanoCpus": 1000000000,
+      "pidsLimit": 256,
+      "binds": [
+        "/run/proofops/run_20261108173349_bb2374a6a08b3fe8:/run/proofops"
+      ]
+    }
+  },
+  "tokens": {
+    "total": 16568,
+    "calls": 14
+  },
+  "files": {
+    "spec.json": "19afbb6b32f0526a9ee0d38765c55013a958748c94e22b71ee8c59a9ee3185b2",
+    "scope.json": "7737a229ff4db5a5ce56215976d7fb5e4a52ace087ffa658082d8f58271e025c",
+    "observations/step-00.json": "519d2b0699cd8aa44342238369f027a10bbaa7acfe8b847c34ebf0929fd80752",
+    "screenshots/step-00.png": "fbc7c4337794ddc031242803d03f30f57a9910fed5ef7d456cb2365b23f7b018",
+    "observations/step-01.json": "a7c992997764bda512a530f69f3f0f80f2d23e2661f584d1c2fe93ea3620a1c0",
+    "screenshots/step-01.png": "8c6b13b228b03378f10efdb9055cad670cb5806571914cdc9a18a217870596fa",
+    "observations/step-02.json": "2150d9228c61452398dd2044f711da985d4fe71b45b29e834fc2a239eba9b10f",
+    "observations/step-03.json": "1fb218d8d6ccb32a119a5fac471bea9cc8e2b62a0d95cb6a1b0521eeb1393b5b",
+    "screenshots/step-03.png": "a54af07f2596b15fd57673e31e87bd56c32c8fdbca81e63be618d3c4db24dd76",
+    "observations/step-04.json": "9853b81bae26f8d831810f2e0942a5ccd28e106e1abff9e956d153452e3e0f1b",
+    "screenshots/step-04.png": "0d03272bf7e63011f852dab46cc32f2e1b8d643b905eb8cfdf799163b1249385",
+    "observations/step-05.json": "bef0988856b95fc039da7f0787fef8b714bbc79478aa9ffee4553ab957b58cc0",
+    "screenshots/step-05.png": "cccb0df2b73706fb35e76e0d5f8b13f1e37563d3c3e52ad09fcb65c9e5b47764",
+    "observations/step-06.json": "714f994bea4d2b571a04666889c378440d1f741698e05803ec699dabc22fa992",
+    "screenshots/step-06.png": "6fb52128759b429c0cdcf4a83057248218d6f8eb482bf025197c399196166357",
+    "observations/step-07.json": "8ae0bc7d59e9bb89f097e6ac0be2ba778be288b710f92ac5f68d4589ad5cc50e",
+    "screenshots/step-07.png": "dfbd7ebe84adfa27f5f9a44579f8c580e25c4965c42e6f00baf9b6c23fc906df",
+    "observations/step-08.json": "7f79df55dc73282ee9f19491eec11a24b03d603a49ae485dc456cccca001846d",
+    "observations/step-09.json": "fddac54834e183eb83c3a9b92b900a86254640c04eaa0593dd2d73e2325c8728",
+    "screenshots/step-09.png": "b7944635bf16dde72f53542ac2e004a471427ae24329d22d01ad37a6b9d05e2a",
+    "observations/step-10.json": "54086344a2aba4fd39799b84b377aead4906faad1f5d8fcaa8598e6cd2045e8c",
+    "screenshots/step-10.png": "4bd7ff9c9f24f4b1efb91aa79a6faa90923669914a5895937e9caba8fc821464",
+    "observations/step-11.json": "56201617d3f1efe034c4933e49c39e8fc9284006da38ca3753ac45e422803b59",
+    "observations/step-12.json": "0d239081a11b9917b4f7b76b9c0f1eb207d87d672da94c36cf97d1b57136da37",
+    "screenshots/step-12.png": "d634dfafccdcff1c0eaad4f0da91a2f83a30e3f22cdc589193e60d8e2b620f0a",
+    "observations/step-13.json": "ac650480108c47e54ad3d3b8a296c0f8b2e9ec19d2cec20554fb474997e59093",
+    "screenshots/final.png": "d634dfafccdcff1c0eaad4f0da91a2f83a30e3f22cdc589193e60d8e2b620f0a",
+    "worker-network.json": "39438aeaf67bcde419eb9de90c72db1a622fe40f2dd933453db80cfbb759708e",
+    "worker-events.json": "06af2b6098b4dfa4b585ce130ff7abf3cd96a624ae58a9159d45cd41eb940336",
+    "server-state.json": "39dd785e97916a1f89cd9f6a9c56caac85f6b74c808a68292a7124b15b9e7e19",
+    "gateway.jsonl": "725b105f6b7dded81218e3cdd58b4de7729ee4b9f4fa6e5656172923f803bf91",
+    "model-calls.jsonl": "d83687b4e89d5dd69b5fe1cd2085340461a8d738930e567bfb79b91e27ec7e33",
+    "policy-decisions.jsonl": "f9a7a252179be135d117170c35106cddc19408ed9984af8131a1594106a22329",
+    "cleanup.json": "f43ecf3e653c37044e57602c99f2dd7a611c635bb424c4fd942a2f6dde7ee7f5",
+    "assertions.json": "b05fbb59191ca4ec2a8fed35adc9412f6d4c103a41b08077d69fde77d76b2d5f",
+    "events.jsonl": "38f43c7ce7c3891da2bd893dc153f213f16778921d42613c27f43ffe5796e17a",
+    "report.md": "cca38ac0bfb0f4265300870ccdc5079927b47eebd11c750552f42a9228334c1b"
+  }
+}

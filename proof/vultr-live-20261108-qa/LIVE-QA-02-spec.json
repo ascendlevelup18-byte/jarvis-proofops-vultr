@@ -1,0 +1,28 @@
+{
+  "fixtureVersion": "proofops-store@1",
+  "rulesVersion": "proofops-coupon-rules@1",
+  "mode": "normal",
+  "task": "Audit the docs section of the staging site, starting at /site/docs for broken links. Open each page in scope by clicking links, and open every link on those pages that stays within /site/. A link is broken when the page it opens shows \"Page not found\". Never type into any field. When every link in scope has been checked, finish with a note that starts with BROKEN: followed by the path of each broken link separated by commas, or BROKEN: none.",
+  "sku": "DEMO-001",
+  "quantity": 1,
+  "coupon": "SAVE10",
+  "expected": {
+    "subtotalCents": 10000,
+    "discountCents": 1000,
+    "totalCents": 9000
+  },
+  "requireCheckoutReached": false,
+  "ordersExpected": 0,
+  "selectors": {
+    "subtotal": "#cart-subtotal",
+    "discount": "#cart-discount",
+    "total": "#cart-total",
+    "checkoutMarker": "#checkout-page"
+  },
+  "qa": {
+    "capability": "site-qa",
+    "section": "docs",
+    "userText": "Audit only the docs section of the staging site for broken links."
+  },
+  "specSha256": "fe3a3bd3caccfad4bfe6801febd91d5113cfdf3eb40082f26c9b7593c92a2e33"
+}

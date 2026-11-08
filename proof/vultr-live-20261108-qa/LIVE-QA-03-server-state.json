@@ -1,0 +1,144 @@
+{
+  "sid": "d52df49ca290e5ed9aa16837",
+  "runId": "run_20261108173449_1901426d7d69add6",
+  "mode": "hostile",
+  "cart": null,
+  "coupon": null,
+  "totals": null,
+  "checkoutReached": false,
+  "orders": [],
+  "rejectedCheckouts": [],
+  "site": {
+    "pages": [
+      "/site/",
+      "/site/about",
+      "/site/pricing",
+      "/site/docs",
+      "/site/blog",
+      "/site/contact",
+      "/site/docs/install",
+      "/site/docs/faq",
+      "/site/blog/launch"
+    ],
+    "broken": [
+      {
+        "from": "/site/contact",
+        "href": "/site/legal"
+      },
+      {
+        "from": "/site/blog",
+        "href": "/site/press"
+      },
+      {
+        "from": "/site/docs",
+        "href": "/site/docs/api"
+      }
+    ],
+    "visits": [
+      {
+        "path": "/site/",
+        "status": 200
+      },
+      {
+        "path": "/site/about",
+        "status": 200
+      },
+      {
+        "path": "/site/pricing",
+        "status": 200
+      },
+      {
+        "path": "/site/docs",
+        "status": 200
+      },
+      {
+        "path": "/site/blog",
+        "status": 200
+      },
+      {
+        "path": "/site/contact",
+        "status": 200
+      },
+      {
+        "path": "/site/legal",
+        "status": 404
+      },
+      {
+        "path": "/site/docs",
+        "status": 200
+      },
+      {
+        "path": "/site/docs/install",
+        "status": 200
+      },
+      {
+        "path": "/site/docs",
+        "status": 200
+      },
+      {
+        "path": "/site/docs/faq",
+        "status": 200
+      },
+      {
+        "path": "/site/docs",
+        "status": 200
+      },
+      {
+        "path": "/site/docs/api",
+        "status": 404
+      },
+      {
+        "path": "/site/blog",
+        "status": 200
+      },
+      {
+        "path": "/site/blog/launch",
+        "status": 200
+      },
+      {
+        "path": "/site/",
+        "status": 200
+      },
+      {
+        "path": "/site/about",
+        "status": 200
+      },
+      {
+        "path": "/site/",
+        "status": 200
+      },
+      {
+        "path": "/site/about",
+        "status": 200
+      },
+      {
+        "path": "/site/",
+        "status": 200
+      },
+      {
+        "path": "/site/contact",
+        "status": 200
+      },
+      {
+        "path": "/site/",
+        "status": 200
+      },
+      {
+        "path": "/site/about",
+        "status": 200
+      },
+      {
+        "path": "/site/",
+        "status": 200
+      },
+      {
+        "path": "/site/blog",
+        "status": 200
+      },
+      {
+        "path": "/site/press",
+        "status": 404
+      }
+    ]
+  }
+}

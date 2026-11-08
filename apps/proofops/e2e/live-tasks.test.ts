@@ -299,6 +299,8 @@ test("LT-16 [CHROMIUM] hostile text typed as a task stays text, and example butt
   await page.locator("#settings-open").click();
   await page.locator("#clear-chat").click();
   await page.locator(".example").first().click();
+  assert.match(await page.locator("#task-text").inputValue(), /Audit the staging website for broken links/);
+  await page.locator(".example").nth(1).click();
   assert.match(await page.locator("#task-text").inputValue(), /2 ProofOps Field Jackets/);
   await ctx.close();
 });
